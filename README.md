@@ -24,7 +24,7 @@ Add the marketplace, then install the plugin:
 The same two steps from a terminal:
 
 ```bash
-claude marketplace add shipcraft https://github.com/Venkateshvenki404224/shipcraft-skills
+claude plugin marketplace add Venkateshvenki404224/shipcraft-skills
 claude plugin install shipcraft@shipcraft
 ```
 
