@@ -1,0 +1,24 @@
+{
+  "name": "shipcraft",
+  "owner": {
+    "name": "Venkatesh",
+    "url": "https://github.com/Venkateshvenki404224"
+  },
+  "description": "Agent skills that carry engineering work from a foggy idea to shipped code.",
+  "plugins": [
+    {
+      "name": "shipcraft",
+      "source": "./",
+      "description": "Four skills for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, and deepen the architecture.",
+      "category": "engineering",
+      "keywords": [
+        "engineering",
+        "skills",
+        "planning",
+        "architecture",
+        "performance",
+        "productivity"
+      ]
+    }
+  ]
+}

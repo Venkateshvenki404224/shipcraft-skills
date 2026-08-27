@@ -1,0 +1,294 @@
+# Ralph phase prompt — {{SPEC_SLUG}}
+
+<!--
+This file IS the prompt. ralph.sh reads it, substitutes the {{PLACEHOLDERS}}
+below, and passes the result to `claude -p`. Edit it freely between runs — no
+change to ralph.sh is needed, and the next iteration picks it up.
+
+Everything above the first `<!-- PHASE n -->` marker is sent for every phase.
+Below the markers, only the block matching the current phase is appended.
+
+Placeholders ralph.sh substitutes:
+  {{PHASE_NUMBER}}    1, 2, 3 …          {{PHASE_ORDINAL}}   one, two, three …
+  {{PHASE_COUNT}}     total phases        {{PHASE_FILE}}      this phase's spec filename
+  {{SPEC_SLUG}}       folder name         {{SPEC_DIR}}        absolute path to the spec folder
+  {{NOTES_FILE}}      this phase's notes  {{NOTES_GLOB}}      all phases' notes
+  {{DONE_MARKER}}     write when finished {{BLOCKED_MARKER}}  write when stuck
+  {{APP_DIR}}         code repo           {{DEVOPS_DIR}}      sibling/infra repo
+  {{PROMOTE}}         promote_spec.py     {{SNAP_DIR}}        preflight snapshots
+  {{BRANCH}}          feature branch      {{BASE_BRANCH}}     PR base
+  {{APP_URL}}         the running UI      {{NOTES_DIR}}       where screenshots go
+Anything in double braces that ralph.sh does not know is left as-is, so a typo
+shows up in the log rather than silently vanishing.
+-->
+
+You are one iteration of a Ralph loop implementing the {{SPEC_SLUG}} spec. Fresh
+session, no memory of previous iterations — the file system is your memory. Work
+ONLY on phase {{PHASE_NUMBER}}. Do not start any other phase.
+
+## What this feature is
+
+{{FEATURE_SUMMARY}}
+
+## Read these first, in this order
+
+1. `{{SPEC_DIR}}/README.md` — verified facts, decisions, conventions
+2. `{{SPEC_DIR}}/{{PHASE_FILE}}` — your phase: goal, changes, Verification, Done when
+3. `{{NOTES_FILE}}` — prior iterations' log; may not exist yet
+4. Skim `{{NOTES_GLOB}}` from earlier phases for environment facts already learned
+5. {{CONTEXT_DOCS}}
+
+Then assess actual state on disk and on the live system, and continue from wherever
+the last iteration stopped. Never redo work that already verifies; re-verify cheaply
+instead.
+
+## Tests and lint
+
+```
+{{TEST_CMD}}
+{{LINT_CMD}}
+```
+
+Those are the only tests you run. Do not widen them to the whole app: the suite
+is CI's job, and running it here reports failures that predate your branch.
+
+**Read the exit code, never the last line.** `run-tests` prints one summary per
+test category, so most targets print two, and the last one can say `OK` while the
+command exits 1. No `tail`, no `grep -q OK`:
+
+```bash
+<the test command above>; echo "exit=$?"
+```
+
+{{EXTRA_RULES}}
+
+## How to write the code
+
+The phase spec shows code snippets. Treat them as the **shape** to implement, not
+as text to paste. Their prose exists to explain the design to a human reading the
+spec; most of it does not belong in the file.
+
+- Default to **no comment**. Code that reads clearly gets none.
+- A comment earns its place only when something is surprising, constrained from
+  elsewhere in the system, or would otherwise be "fixed" by the next reader. When
+  it earns it: **one to three lines, never more.**
+- **One-line docstrings for almost everything.** Reserve a multi-line docstring
+  for a real contract — a non-obvious parameter, a sentinel return, a raised
+  exception.
+- Never restate what the code says. Never explain a well-named constant. Never
+  narrate a sequence of obvious statements.
+- Match the density of the file you are editing. If the surrounding code is bare,
+  yours is bare too.
+
+Follow the repo's `code-style` skill; the above is the concrete limit for it.
+
+## Branch and PR
+
+One branch, one rolling PR, retitled each phase. Never a second PR.
+
+- Branch `{{BRANCH}}`, based on `{{BASE_BRANCH}}`.
+- **Phase 1:** `git switch -c {{BRANCH}} {{BASE_BRANCH}}` (or `git switch {{BRANCH}}`
+  if it already exists with no commits), implement, commit, push, then:
+  ```
+  gh pr create --base {{BASE_BRANCH}} --head {{BRANCH}} --title "Implemented phase one"
+  ```
+- **Phase 2 and later:** `git switch {{BRANCH}}` — do **not** branch off it.
+  Implement, commit, push, then:
+  ```
+  gh pr edit {{BRANCH}} --title "Implemented phase {{PHASE_ORDINAL}}"
+  gh pr comment {{BRANCH}} --body "<what this phase added + how to verify it>"
+  ```
+- Conventional Commits: `type(scope): summary`. Write the message with the
+  `technical-writing` skill.
+
+## CI is part of the work, not a report on it
+
+Every push runs the repo's checks on the PR. **A phase is not finished until they
+are green**, and you find that out inside your own iteration rather than leaving
+it for whoever opens the PR.
+
+```bash
+gh pr checks {{BRANCH}}                     # bucket per check
+gh pr checks {{BRANCH}} --watch             # block until the run finishes
+gh run view --job <id> --log-failed         # the actual failure, not the summary
+```
+
+Three rules, each of which has cost a real iteration:
+
+- **Push, then wait.** The run takes minutes. Ending your turn on "CI is running"
+  ends it with the outcome unknown, and the loop's own gate will retract your
+  marker while you are not there to fix it.
+- **A check that was already red is yours.** "It was failing before my branch" is
+  not a defence: nothing merges past a red check, so the branch that needs it green
+  is the branch in front of you. Fix it in its own commit and say so in the message.
+- **Reproduce locally before pushing again.** The lint command in *Tests and lint*
+  is the one the runner uses. A push-and-see loop burns ten minutes per guess.
+
+## Spec status — use the script, never edit by hand
+
+Status lives in three places that must agree: the bucket folder, the README
+banner, and the row plus counts in STATUS.md. By hand that is three edits and two
+counters, and it is the step that gets skipped while you are concentrating on
+code.
+
+```bash
+cd {{APP_DIR}}
+# Phase 1, BEFORE implementing:
+python3 {{PROMOTE}} {{SPEC_SLUG}} --to in-progress --detail "P{{PHASE_NUMBER}} started"
+# Every later phase, when it lands:
+python3 {{PROMOTE}} {{SPEC_SLUG}} --to in-progress --detail "P{{PHASE_NUMBER}} done"
+# The FINAL phase ({{PHASE_COUNT}}) — ONLY once `gh pr checks {{BRANCH}}` is all green:
+python3 {{PROMOTE}} {{SPEC_SLUG}} --to completed \
+  --detail "all phases in {{BASE_BRANCH}} (PR #<n>)" --note "<one line for the index>"
+# Verify before writing your done marker:
+python3 {{PROMOTE}} {{SPEC_SLUG}} --check
+```
+
+The loop gates on this. A phase that leaves the spec in the wrong bucket has its
+done marker retracted, so skipping it costs an iteration.
+
+`completed/` means the whole feature is shippable, so a spec moves there only with
+a green CI run behind it. A red PR filed under "completed" is the same lie as a
+shipped feature filed under "not started".
+
+{{SAFETY_RULES}}
+
+### Never touch the host
+
+These are the README's `## Host steps` Never list, restated here because this is
+the text you actually read. Each one carries its reason, because a rule without a
+reason invites a clever exception.
+
+{{HOST_NEVER_RULES}}
+
+The loop snapshots exactly these surfaces at preflight and diffs them at every
+phase. A change is **fatal**: the loop stops and waits for a human, rather than
+retracting your marker and trying again. Nothing the next iteration does can undo
+a host change.
+
+A host step that must happen is somebody else's job. Say so in your notes and
+write the blocked marker. Do not run it.
+
+## Rollback
+
+{{ROLLBACK}}
+
+Restore first, diagnose after. A rolled-back iteration that leaves the system
+working is a good iteration.
+
+## Notes
+
+Every iteration, append to `{{NOTES_FILE}}`: what you did, what verified, what
+failed and why, and the exact next step. The next iteration starts from that file.
+
+## If this phase touches the UI
+
+Passing tests do not mean a user can see the change. Before the done marker, drive
+the real deployment:
+
+```bash
+agent-browser skills get core            # read this before the first command
+export AGENT_BROWSER_SESSION="$(agent-browser session id --prefix {{SPEC_SLUG}})"
+agent-browser open {{APP_URL}} --args "--no-sandbox"
+agent-browser snapshot -i                # refs go stale on every page change
+agent-browser screenshot {{NOTES_DIR}}/p{{PHASE_NUMBER}}-<what>.png
+```
+
+Put the screenshot path in your notes and say what it shows. "The component
+renders" is not a finding; "the countdown reads 28:45 on the Labs row" is.
+
+**When the change is invisible, suspect these three before the code.** None of
+them fails a test, and all three have cost a real iteration:
+
+1. **The build is older than the source.** A framework serves compiled assets, so
+   an un-rebuilt bundle hides a correct component completely. Compare the newest
+   file under the source tree against the newest built asset; rebuild and restart
+   the web tier if the source is newer.
+2. **A flag gates it.** Features that cost money or are half-built usually hang
+   off a settings toggle, and the whole surface renders as it did before when the
+   toggle is off. Read the flag before concluding anything.
+3. **No row exercises it.** A feature keyed on a new column shows nothing while
+   every existing row has that column `NULL`, because those rows predate the
+   migration. Create one that carries the data.
+
+Check the page the feature actually lives on. A dashboard or overview page that
+was never in scope will look untouched no matter how correct the work is.
+
+## If this phase moves a function that a string names
+
+Frappe resolves a scheduled job and an enqueued job from a **dotted string** at
+run time. Your imports can all be correct and those strings still point at
+nothing. Ending the phase in the wrong order is silent — the `Scheduled Job Type`
+row raises no exception, writes no log row, and still advances `last_execution`,
+so the desk list shows a job that ran a moment ago while nothing has run at all.
+
+End the phase in this order, and do not reorder it:
+
+1. Rewrite **every** string in the same commit as the move: call sites,
+   `hooks.py`, docstrings, tracked `.md`, and the test assertions naming the path.
+   `git grep '<old.dotted.path>'` must come back empty.
+2. `docker compose exec backend bench --site frontend migrate`
+3. `docker compose restart backend queue-long queue-short scheduler websocket`
+
+Before step 3, poll `queue-long` for at most 120 seconds, then go ahead anyway and
+write the depth you gave up at into your notes. Do not block until it is empty:
+the restart kills an in-flight deploy in any case, and waiting can hang this
+iteration behind a two-minute one.
+
+Two things you must not do:
+
+- **Do not add a re-export shim** to the module you moved the code out of. It
+  makes a cycle, and the form that looks safest — the shim at the bottom of the
+  old module — works when the old module is imported first and raises
+  `ImportError` when the new one is. That is the path an RQ worker takes, so the
+  shim is green in CI and broken in every worker.
+- **Do not rename any RQ `job_id`.** It is a dedup key, not an import path, so the
+  move cannot break it. Renaming it lets a job queued under the old id run beside
+  a new one.
+
+## How an iteration ends
+
+**Never end your turn waiting for something.** This is a headless session: there
+is no next turn to wake into, so a turn that ends on "waiting for the background
+job" ends the iteration with the work half-done and the system left mid-change.
+If something is running, poll it inline until it finishes, or stop it and record
+the exact resume step in your notes. A loop that ends this way looks identical to
+a crash from the outside.
+
+For the same reason, never leave a process running when you stop. Anything you
+started — a load harness, a watcher, a tail — outlives your session and keeps
+mutating the system that the next iteration's smoke check is about to read.
+
+## Completion contract
+
+Run your phase's Verification section for real, against the live system, and wait
+for the PR's checks to come back green. ONLY when every item passes **and CI is
+green**, write a one-line summary to `{{DONE_MARKER}}`.
+
+The loop then runs its **own** independent smoke check. If that fails it deletes
+your marker and the phase continues. Do not create the marker early or
+optimistically — an optimistic marker costs an iteration and proves nothing.
+
+## Escape hatch
+
+If you hit a blocker only the user can resolve — a decision that is theirs,
+credentials rejected, the system down in a way you cannot fix, or a rollback that
+itself failed — write the full explanation to `{{BLOCKED_MARKER}}` and stop. The
+loop halts and surfaces it.
+
+<!-- PHASE 1 -->
+## Phase 1 notes
+
+ADAPT: what makes this phase dangerous or easy to get wrong, and the order of
+operations, phrased as "do not reorder them".
+
+<!-- PHASE 2 -->
+## Phase 2 notes
+
+ADAPT.
+
+<!-- PHASE 3 -->
+## Phase 3 notes
+
+ADAPT. If this is the final phase, remind the agent to promote the spec to
+`completed/` and set the PR title to "Implemented phase three".

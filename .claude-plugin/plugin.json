@@ -1,0 +1,26 @@
+{
+  "name": "shipcraft",
+  "displayName": "Shipcraft",
+  "version": "0.1.0",
+  "description": "Four skills for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, and deepen the architecture.",
+  "author": {
+    "name": "Venkatesh",
+    "url": "https://github.com/Venkateshvenki404224"
+  },
+  "repository": "https://github.com/Venkateshvenki404224/shipcraft-skills",
+  "license": "MIT",
+  "keywords": [
+    "engineering",
+    "skills",
+    "planning",
+    "architecture",
+    "performance",
+    "productivity"
+  ],
+  "skills": [
+    "./skills/wayfinder",
+    "./skills/issue-to-phases",
+    "./skills/dsa-conscious-coding",
+    "./skills/improve-codebase-architecture"
+  ]
+}
