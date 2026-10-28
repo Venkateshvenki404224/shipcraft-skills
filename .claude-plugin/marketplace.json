@@ -9,7 +9,7 @@
     {
       "name": "shipcraft",
       "source": "./",
-      "description": "Five skills for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, and draw the design as reviewed Excalidraw diagrams.",
+      "description": "Eight skills and three agents for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, draw the design as reviewed Excalidraw diagrams, and ship pull requests with reviewed screenshots. The agents implement, review and test Frappe changes.",
       "category": "engineering",
       "keywords": [
         "engineering",
@@ -18,7 +18,9 @@
         "architecture",
         "performance",
         "productivity",
-        "diagrams"
+        "diagrams",
+        "pull-requests",
+        "frappe"
       ]
     }
   ]
