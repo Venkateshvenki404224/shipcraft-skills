@@ -1,6 +1,6 @@
 # Shipcraft
 
-Four agent skills for Claude Code. They carry engineering work from a foggy idea
+Five agent skills for Claude Code. They carry engineering work from a foggy idea
 to shipped code.
 
 Each skill covers one stage. Use one on its own, or run them in order.
@@ -11,6 +11,7 @@ Each skill covers one stage. Use one on its own, or run them in order.
 | 2. Slice | [`issue-to-phases`](skills/issue-to-phases/) | Breaks a plan into thin end-to-end phases under `specs/`. Can also write a Ralph loop that builds the phases unattended. |
 | 3. Build | [`dsa-conscious-coding`](skills/dsa-conscious-coding/) | Picks the data structure and the query before the code. Checks Big O against the data size the feature will really see. |
 | 4. Deepen | [`improve-codebase-architecture`](skills/improve-codebase-architecture/) | Finds shallow modules, reports them as an HTML page with before and after diagrams, then works through the one you pick. |
+| Any stage | [`excalidraw-architecture`](skills/excalidraw-architecture/) | Draws the design as Excalidraw diagrams from a Python builder, renders them to PNG on your machine, attaches them to the plan, and reviews the design until every lens approves. |
 
 ## Install
 
@@ -52,7 +53,8 @@ get them:
 Then run `/setup-matt-pocock-skills` once per repository. This step tells
 `wayfinder` which issue tracker to write the map to.
 
-`issue-to-phases` and `dsa-conscious-coding` have no companion skills.
+`issue-to-phases`, `dsa-conscious-coding` and `excalidraw-architecture` have no
+companion skills.
 
 ## What each skill assumes
 
@@ -67,6 +69,13 @@ requirement.
 
 `dsa-conscious-coding` uses Python and Frappe in its code samples. The decision
 table and the Big O checks apply to any language.
+
+`excalidraw-architecture` needs Python 3 and Node.js with npm. It drives the
+renderer with [agent-browser](https://www.npmjs.com/package/agent-browser)
+through `npx`. The first render installs `@excalidraw/excalidraw` from npm and
+bundles it, so it needs the network once. After that, rendering is offline. The design review uses
+[TypeSafe](https://typesafe.ai) when `TYPESAFE_API_KEY` is set. Without the key,
+the agent answers the review questions itself.
 
 `improve-codebase-architecture` writes an HTML report to the system temporary
 directory and opens it. Nothing lands in your repository.

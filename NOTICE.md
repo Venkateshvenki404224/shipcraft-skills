@@ -1,6 +1,6 @@
 # Notice
 
-This repository holds four skills. Two of them are copies of another project.
+This repository holds five skills. Two of them are copies of another project.
 This file records where each skill comes from.
 
 | Skill | Origin | License |
@@ -9,6 +9,7 @@ This file records where each skill comes from.
 | `improve-codebase-architecture` | Copied without change from [mattpocock/skills](https://github.com/mattpocock/skills) | MIT, Copyright (c) 2026 Matt Pocock |
 | `issue-to-phases` | Written for this project | MIT, see [LICENSE](LICENSE) |
 | `dsa-conscious-coding` | Written for this project | MIT, see [LICENSE](LICENSE) |
+| `excalidraw-architecture` | Written for this project | MIT, see [LICENSE](LICENSE) |
 
 The full license text of the copied work is in
 [licenses/mattpocock-skills.LICENSE](licenses/mattpocock-skills.LICENSE).

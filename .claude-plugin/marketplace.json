@@ -9,7 +9,7 @@
     {
       "name": "shipcraft",
       "source": "./",
-      "description": "Four skills for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, and deepen the architecture.",
+      "description": "Five skills for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, and draw the design as reviewed Excalidraw diagrams.",
       "category": "engineering",
       "keywords": [
         "engineering",
@@ -17,7 +17,8 @@
         "planning",
         "architecture",
         "performance",
-        "productivity"
+        "productivity",
+        "diagrams"
       ]
     }
   ]
