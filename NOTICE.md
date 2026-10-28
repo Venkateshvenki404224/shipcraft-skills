@@ -1,6 +1,7 @@
 # Notice
 
-This repository holds five skills. Two of them are copies of another project.
+This repository holds eight skills and three agents. Two of the skills are
+copies of another project.
 This file records where each skill comes from.
 
 | Skill | Origin | License |
@@ -10,6 +11,10 @@ This file records where each skill comes from.
 | `issue-to-phases` | Written for this project | MIT, see [LICENSE](LICENSE) |
 | `dsa-conscious-coding` | Written for this project | MIT, see [LICENSE](LICENSE) |
 | `excalidraw-architecture` | Written for this project | MIT, see [LICENSE](LICENSE) |
+| `raise-pr` | Written for this project | MIT, see [LICENSE](LICENSE) |
+| `pr-screenshots` | Written for this project | MIT, see [LICENSE](LICENSE) |
+| `visual-reviewer` | Written for this project | MIT, see [LICENSE](LICENSE) |
+| `frappe-implementer`, `frappe-reviewer`, `frappe-tester` (agents) | Written for this project | MIT, see [LICENSE](LICENSE) |
 
 The full license text of the copied work is in
 [licenses/mattpocock-skills.LICENSE](licenses/mattpocock-skills.LICENSE).
