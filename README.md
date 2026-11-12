@@ -52,6 +52,36 @@ git clone https://github.com/Venkateshvenki404224/shipcraft-skills
 cp -r shipcraft-skills/skills/wayfinder .claude/skills/
 ```
 
+## Run `/work` in a cloud session
+
+> **⭐ Recommended starter prompt.** It is tested and works well. Copy it as is into a
+> Claude Code cloud session (claude.ai/code), or into a scheduled cloud agent
+> (`/schedule`), for the repository you want to work on. Replace the last line
+> with your feature or issue number. The agent installs the skill, writes the
+> project profile with you, and gives you the run board as an Artifact link.
+
+```
+Set up the /work skill from my shipcraft plugin in this repo, then use it.
+
+1. If /work is not in your skill list: add this to .claude/settings.json (merge, don't overwrite), so later sessions load it:
+   {"extraKnownMarketplaces": {"shipcraft": {"source": {"source": "github", "repo": "Venkateshvenki404224/shipcraft-skills"}}},
+    "enabledPlugins": {"shipcraft@shipcraft": true}}
+   For this session, clone https://github.com/Venkateshvenki404224/shipcraft-skills to /tmp/shipcraft, read /tmp/shipcraft/skills/work/SKILL.md, and follow it exactly. S = /tmp/shipcraft/skills/work. Don't commit the settings change unless I say so.
+2. Run the first-time setup (references/setup.md): read the repo's CI, scripts and docs, draft .claude/work.json, run the check commands once, and show me the profile as a table to confirm. Don't guess values; mark anything you inferred.
+3. This is a cloud session, so I can't open localhost. Make the run board as a snapshot (scripts/board/wfboard.py --snapshot .agent/board.html), publish it with the Artifact tool, give me the link, and republish it at H1, after QA and at H2. Print the stage table (scripts/state.py show) at each gate.
+4. Before writing or editing any workflow script, load the workflow-authoring skill.
+5. Then run: /work <describe the feature, or the issue number>
+If agent-browser, ffmpeg or Playwright are missing here, run without video/screenshots and say so in the evidence. Don't install them without asking.
+```
+
+On your own machine you do not need this prompt: install the plugin and type
+`/work <feature>`. The board then opens on localhost, and the skill gives you
+the link.
+
+The run stops for you twice: at H1 (approve the plan) and at H2 (ship or not).
+A scheduled agent cannot answer for you, so it waits at H1. Answer in the
+session with `/work approve`, then `/work ship`.
+
 ## Companion skills
 
 `wayfinder` and `improve-codebase-architecture` call other skills by name:
