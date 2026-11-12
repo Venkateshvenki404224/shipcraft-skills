@@ -1,0 +1,33 @@
+{
+  "project": "Acme",
+  "base": "main",
+  "branch_prefix": "agent/",
+  "rules": ["CLAUDE.md"],
+  "review_rules": ".claude/work-review-rules.md",
+  "secrets": [".env*", "tests/e2e/.auth/*"],
+
+  "app": {
+    "url": "http://localhost:3000",
+    "check": "curl -sk -o /dev/null -w '%{http_code}' http://localhost:3000/login",
+    "expect": "200",
+    "start": "docker compose up -d",
+    "start_minutes": 3,
+    "login": "npx playwright test --project=setup",
+    "auth": "tests/e2e/.auth/{role}.json",
+    "fixtures": "npm run seed:test"
+  },
+  "roles": ["admin", "user", "signed-out"],
+
+  "gate": ["npm run lint", "npm run typecheck", "npm test"],
+  "e2e": {
+    "dir": "tests/e2e",
+    "cmd": "cd tests/e2e && npx playwright test {specs} --retries=0",
+    "full": "cd tests/e2e && npx playwright test",
+    "browsers": ["chromium", "firefox", "webkit"]
+  },
+  "ui_snap": { "dir": "tests/e2e/ui-snap", "theme_key": null, "hide": [".cookie-banner"], "channel": null },
+  "video": true,
+
+  "models": { "plan": "opus", "approve": "opus", "research": "sonnet", "work": "sonnet" },
+  "ship": { "mode": "pr" }
+}
