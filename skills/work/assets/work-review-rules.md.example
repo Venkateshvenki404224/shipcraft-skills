@@ -1,0 +1,10 @@
+# Project review rules
+
+The verify and UI review agents cite these headings, next to the skill's own `references/review-rules.md`. Write rules a reviewer can check in the diff or the browser, each with the reason. Mark the ones that block a ship with (BLOCKING).
+
+## Example: users only see the new UI (BLOCKING)
+- Non-admins never reach `/legacy/*`; they are redirected to the `/app/*` equivalent. Signed-out visitors go to `/login`.
+- Why: the legacy pages skip the new permission checks.
+
+## Example: naming
+- User-facing text says "Workspace", never the old name "Project".

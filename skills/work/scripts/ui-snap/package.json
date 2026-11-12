@@ -1,0 +1,8 @@
+{
+  "name": "work-ui-snap",
+  "private": true,
+  "description": "Before/after screenshots for the /work skill. Only needed when the project has no Playwright of its own.",
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

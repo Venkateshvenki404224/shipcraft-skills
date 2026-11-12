@@ -1,6 +1,6 @@
 # Shipcraft
 
-Eight agent skills and three agents for Claude Code. They carry engineering work
+Nine agent skills and three agents for Claude Code. They carry engineering work
 from a foggy idea to a merged pull request.
 
 Each skill covers one stage. Use one on its own, or run them in order.
@@ -11,6 +11,7 @@ Each skill covers one stage. Use one on its own, or run them in order.
 | 2. Slice | [`issue-to-phases`](skills/issue-to-phases/) | Breaks a plan into thin end-to-end phases under `specs/`. Can also write a Ralph loop that builds the phases unattended. |
 | 3. Build | [`dsa-conscious-coding`](skills/dsa-conscious-coding/) | Picks the data structure and the query before the code. Checks Big O against the data size the feature will really see. |
 | 4. Deepen | [`improve-codebase-architecture`](skills/improve-codebase-architecture/) | Finds shallow modules, reports them as an HTML page with before and after diagrams, then works through the one you pick. |
+| 3–5. Build to ship | [`work`](skills/work/) | Runs one feature end to end with an agent pipeline: research, plan, an approval agent, your OK, tests first, implementation, the gate, verification, agent QA per role on video, UI before/after screenshots, evidence, your ship decision. A live run board shows every stage. |
 | 5. Ship | [`raise-pr`](skills/raise-pr/) | Lints like CI, commits, pushes and opens the PR with a short body and screenshots. Watches the checks. Merges only when you ask. |
 | 5. Ship | [`pr-screenshots`](skills/pr-screenshots/) | Captures before and after screenshots of a UI change, crops them to the change, marks it in red, and publishes them in the PR body. |
 | 5. Ship | [`visual-reviewer`](skills/visual-reviewer/) | Judges how a UI change looks to a user: light and dark theme, mobile, spacing, contrast. Returns LGTM, REQUEST CHANGES or BLOCKED. |
@@ -103,6 +104,16 @@ crops and marks images with Pillow, and commits them under
 
 The three agents expect a Frappe bench. `frappe-tester` runs
 `bench run-tests` against a development site.
+
+`work` needs Python 3, git, and the Workflow tool in Claude Code (without it,
+the skill runs the same stages with plain subagents). On first use in a
+repository it writes `.claude/work.json`, the project profile: gate commands,
+app URL, roles, saved logins. It reads them from your CI config, scripts and
+docs, and asks you to confirm. The UI before/after layer needs Playwright; the
+QA videos need [agent-browser](https://www.npmjs.com/package/agent-browser)
+and ffmpeg. Without them the run still works, and the evidence says what was
+skipped. The run board is `skills/work/scripts/board/`: a local page on
+localhost, or a snapshot published as an Artifact in a cloud session.
 
 `improve-codebase-architecture` writes an HTML report to the system temporary
 directory and opens it. Nothing lands in your repository.
