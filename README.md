@@ -1,6 +1,6 @@
 # Shipcraft
 
-Nine agent skills and three agents for Claude Code. They carry engineering work
+Ten agent skills and three agents for Claude Code. They carry engineering work
 from a foggy idea to a merged pull request.
 
 Each skill covers one stage. Use one on its own, or run them in order.
@@ -15,6 +15,7 @@ Each skill covers one stage. Use one on its own, or run them in order.
 | 5. Ship | [`raise-pr`](skills/raise-pr/) | Lints like CI, commits, pushes and opens the PR with a short body and screenshots. Watches the checks. Merges only when you ask. |
 | 5. Ship | [`pr-screenshots`](skills/pr-screenshots/) | Captures before and after screenshots of a UI change, crops them to the change, marks it in red, and publishes them in the PR body. |
 | 5. Ship | [`visual-reviewer`](skills/visual-reviewer/) | Judges how a UI change looks to a user: light and dark theme, mobile, spacing, contrast. Returns LGTM, REQUEST CHANGES or BLOCKED. |
+| Any stage | [`control-room`](skills/control-room/) | Gives you a live project control room while a team of agents works through Workflow runs: KPIs, a stage stepper, the roles, every agent with status, model, time and result, the environment's health, and a reader for the deliverables. One self-contained HTML page, light and dark. |
 | Any stage | [`excalidraw-architecture`](skills/excalidraw-architecture/) | Draws the design as Excalidraw diagrams from a Python builder, renders them to PNG on your machine, attaches them to the plan, and reviews the design until every lens approves. |
 
 ## Agents
@@ -144,6 +145,16 @@ QA videos need [agent-browser](https://www.npmjs.com/package/agent-browser)
 and ffmpeg. Without them the run still works, and the evidence says what was
 skipped. The run board is `skills/work/scripts/board/`: a local page on
 localhost, or a snapshot published as an Artifact in a cloud session.
+
+`control-room` needs only Python 3. It reads the workflow journals Claude Code
+writes for the session and rebuilds one HTML file every few seconds; open it in
+a browser. An optional `control-room.json` names the stages, roles, environment
+health check and deliverables (see
+[`references/config.md`](skills/control-room/references/config.md)); without it,
+the stages are the workflow phases and the roles are the agent-label prefixes.
+In a cloud session, `--refresh 0` writes a static snapshot to publish as an
+Artifact. The page loads Inter from Google Fonts and the Markdown reader from
+cdnjs.
 
 `improve-codebase-architecture` writes an HTML report to the system temporary
 directory and opens it. Nothing lands in your repository.

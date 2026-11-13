@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7f9;--surface:#ffffff;--surface-2:#f1f3f6;--border:#e3e6eb;--text:#14181f;--muted:#5d6675;--faint:#8a93a2;
+  --brand:__ACCENT__;--on-brand:#fff;--brand-soft:color-mix(in srgb,var(--brand) 11%,#fff);--blue:#2563eb;--blue-soft:#e8effd;--amber:#b45309;--amber-soft:#fdf3e4;
+  --red:#b91c1c;--red-soft:#fdecec;--green:#15803d;--green-soft:#e7f6ec;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1117;--surface:#151b23;--surface-2:#1c232d;--border:#2a323d;--text:#e6e9ee;--muted:#9aa4b2;--faint:#6e7886;
+  --brand:__ACCENT_DARK__;--on-brand:#0d1117;--brand-soft:color-mix(in srgb,var(--brand) 16%,#151b23);--blue:#60a5fa;--blue-soft:#14233b;--amber:#fbbf24;--amber-soft:#33270f;
+  --red:#f87171;--red-soft:#3a1717;--green:#4ade80;--green-soft:#12301d;--shadow:none;}}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--surface:#151b23;--surface-2:#1c232d;--border:#2a323d;--text:#e6e9ee;--muted:#9aa4b2;--faint:#6e7886;
+  --brand:__ACCENT_DARK__;--on-brand:#0d1117;--brand-soft:color-mix(in srgb,var(--brand) 16%,#151b23);--blue:#60a5fa;--blue-soft:#14233b;--amber:#fbbf24;--amber-soft:#33270f;
+  --red:#f87171;--red-soft:#3a1717;--green:#4ade80;--green-soft:#12301d;--shadow:none;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+a{color:var(--blue)}
+.wrap{max-width:1360px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.mark{width:38px;height:38px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:var(--on-brand);flex:none;font-weight:700;font-size:14px;letter-spacing:.02em}
+h1{font-size:19px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:5px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.dot.off{background:var(--faint);box-shadow:none}
+button.btn{font:inherit;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+button.btn:hover{background:var(--surface-2)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+.kpi{padding:14px 16px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted)}
+.kpi .v{font-size:24px;font-weight:600;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .h{font-size:12px;color:var(--faint)}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:22px 2px 10px}
+.stepper{display:grid;grid-template-columns:repeat(var(--n,10),minmax(0,1fr));gap:0;padding:16px;row-gap:18px}
+.step{position:relative;padding:0 6px;text-align:center}
+.step:before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:2px;background:var(--border);z-index:0}
+.step:first-child:before{display:none}
+.step.done:before,.step.active:before{background:var(--brand)}
+.bubble{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;font-size:12px;font-weight:600;background:var(--surface);border:2px solid var(--border);color:var(--faint)}
+.step.done .bubble{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.step.active .bubble{border-color:var(--brand);color:var(--brand);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--brand) 40%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.step .t{font-size:12.5px;font-weight:600}
+.step .d{font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:2px}
+.step .c{font-size:11px;color:var(--faint);margin-top:4px}
+.grid2{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px}
+.roles{padding:6px;align-self:start}
+.role{display:flex;gap:10px;padding:10px;border-radius:10px;cursor:pointer;align-items:flex-start}
+.role:hover,.role.sel{background:var(--surface-2)}
+.avatar{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;background:var(--brand-soft);color:var(--brand)}
+.role .n{font-weight:600;font-size:13.5px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.role .d{font-size:12px;color:var(--muted)}
+.tag{white-space:nowrap;font-size:11px;font-weight:500;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.counts{font-size:11.5px;color:var(--faint);margin-top:2px}
+.tbl-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap}
+.tbl-head h3{margin:0;font-size:14px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.chip.on{background:var(--text);color:var(--surface);border-color:var(--text)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:11.5px;color:var(--faint);text-align:left;font-weight:500;padding:8px 14px;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+.tbl tr.row{cursor:pointer}
+.tbl tr.row:hover td{background:var(--surface-2)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.running{background:var(--blue-soft);color:var(--blue)}
+.pill.done{background:var(--green-soft);color:var(--green)}
+.pill.failed{background:var(--red-soft);color:var(--red)}
+.pill.warn{background:var(--amber-soft);color:var(--amber)}
+.spin{width:9px;height:9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
+.muted{color:var(--muted)}
+.detail td{background:var(--surface-2);white-space:pre-wrap;font-size:12.5px;color:var(--text);line-height:1.55;overflow-wrap:anywhere}
+.docs{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:520px}
+.doclist{border-right:1px solid var(--border);padding:8px;max-height:760px;overflow:auto}
+.docitem{padding:8px 10px;border-radius:8px;cursor:pointer}
+.docitem:hover,.docitem.sel{background:var(--surface-2)}
+.docitem .p{font-size:11.5px;color:var(--faint);overflow-wrap:anywhere}
+.docitem .t{font-size:13px;font-weight:500}
+.viewer{padding:6px 28px 28px;max-height:760px;overflow:auto;min-width:0}
+.viewer h1{font-size:22px;margin:18px 0 8px}.viewer h2{font-size:17px;margin:22px 0 8px;padding-top:10px;border-top:1px solid var(--border)}.viewer h3{font-size:15px}
+.viewer table{border-collapse:collapse;display:block;overflow:auto;max-width:100%;font-size:12.5px}
+.viewer th,.viewer td{border:1px solid var(--border);padding:5px 8px;vertical-align:top}
+.viewer th{background:var(--surface-2)}
+.viewer code{font-family:"JetBrains Mono",monospace;font-size:12px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+.viewer pre{background:var(--surface-2);padding:12px;border-radius:8px;overflow:auto}
+.viewer pre code{background:none;padding:0}
+.viewer img{max-width:100%}
+.viewer blockquote{margin:0;padding:6px 14px;border-left:3px solid var(--brand);background:var(--brand-soft);border-radius:4px}
+.empty{padding:40px;text-align:center;color:var(--faint)}
+.env{padding:14px 16px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
+.env .item .l{font-size:12px;color:var(--muted)}
+.env .item .v{font-weight:600}
+[hidden]{display:none!important}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.stepper{grid-template-columns:repeat(min(var(--n,10),5),minmax(0,1fr))}.step:nth-child(5n+1):before{display:none}}
+@media (max-width:720px){.docs{grid-template-columns:1fr}.doclist{border-right:none;border-bottom:1px solid var(--border);max-height:240px}.stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.step:before{display:none}.tbl .hide-sm{display:none}.viewer{padding:6px 14px 20px}}
+</style>
+</head>
+<body>
+<script type="application/json" id="data">__DATA__</script>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" id="mark"></div>
+      <div style="min-width:0">
+        <h1 id="title"></h1>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="live"><span class="dot" id="livedot"></span><span id="updated">–</span></span>
+      <button class="btn" id="toggleRefresh">Pause auto-refresh</button>
+      <button class="btn" id="toggleTheme">Theme</button>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="section-title">Workflow</div>
+  <div class="card stepper" id="stepper"></div>
+
+  <div class="section-title">Team &amp; agents</div>
+  <div class="grid2">
+    <div class="card roles" id="roles"></div>
+    <div class="card" style="min-width:0">
+      <div class="tbl-head"><h3 id="agentsTitle">All agents</h3><div class="filters" id="filters"></div></div>
+      <div style="overflow:auto"><table class="tbl" id="agents"></table></div>
+    </div>
+  </div>
+
+  <div id="envBlock" hidden>
+    <div class="section-title" id="envTitle">Environment</div>
+    <div class="card env" id="env"></div>
+  </div>
+
+  <div id="docsBlock" hidden>
+    <div class="section-title">Deliverables</div>
+    <div class="card docs">
+      <div class="doclist" id="doclist"></div>
+      <div class="viewer" id="viewer"><div class="empty">Select a document</div></div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+const D = JSON.parse(document.getElementById('data').textContent);
+const NS = 'cr:'+location.pathname+':';
+const S = (k,v)=>{try{ if(v===undefined) return sessionStorage.getItem(NS+k); sessionStorage.setItem(NS+k,v);}catch(e){return null}};
+const L = (k,v)=>{try{ if(v===undefined) return localStorage.getItem('cr-'+k); localStorage.setItem('cr-'+k,v);}catch(e){return null}};
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => /^(https?:|\/|\.\/|#)/i.test(String(u||'')) ? u : '#';
+const now = Date.now()/1000;
+const theme = L('theme'); if(theme) document.documentElement.dataset.theme = theme;
+document.getElementById('toggleTheme').onclick = ()=>{const cur=document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');const n=cur==='dark'?'light':'dark';document.documentElement.dataset.theme=n;L('theme',n)};
+
+// header
+const initials = n=>String(n||'').split(/[\s/·\-]+/).filter(w=>w&&/[A-Za-z0-9]/.test(w[0])).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'•';
+document.getElementById('title').textContent = D.title;
+document.getElementById('subtitle').textContent = D.subtitle||'';
+document.getElementById('mark').textContent = initials(D.title);
+
+// flatten agents
+const agents=[];
+D.runs.forEach(w=>w.agents.forEach(a=>agents.push({...a,wf:w.name})));
+(D.extra||[]).forEach(a=>agents.push(a));
+const iso = t=> t? Date.parse(t)/1000 : null;
+agents.forEach(a=>{const f=iso(a.first)||a.firstEpoch; a.start=f; const end=a.status==='running'?now:(a.last||now); a.dur=f?Math.max(0,end-f):null;});
+const fmtDur = s=> s==null?'–': s<60? Math.round(s)+'s' : s<3600? Math.floor(s/60)+'m '+String(Math.round(s%60)).padStart(2,'0')+'s' : Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m';
+const fmtAgo = t=>{const s=now-t; return s<60?Math.round(s)+'s ago':s<3600?Math.round(s/60)+' min ago':s<172800?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago'};
+
+const ago = Math.round(now - D.generated);
+document.getElementById('updated').textContent = 'Updated '+(ago<5?'just now':fmtAgo(D.generated));
+if(ago > Math.max(60, D.refresh*6)) document.getElementById('livedot').classList.add('off');
+
+// KPIs
+const running=agents.filter(a=>a.status==='running').length, done=agents.filter(a=>a.status==='done'||a.status==='covered').length, failed=agents.filter(a=>a.status==='failed').length;
+const stDone=D.stages.filter(s=>s.state==='done').length, stActive=D.stages.find(s=>s.state==='active');
+const kp=[
+  ['Agents run', done+' / '+agents.length, running? running+' running now' : failed? failed+' failed · idle':'idle'],
+  ['Current stage', stActive?stActive.title:(D.stages.length&&stDone===D.stages.length?'Complete':(D.stages.length?'Waiting':'No runs yet')), stDone+' of '+D.stages.length+' stages done'],
+  ['Models', [...new Set(agents.map(a=>a.model).filter(Boolean))].join(' · ')||'–', 'per agent, from transcripts'],
+  ['Documents', D.docs.length, D.docs.length? 'latest '+fmtAgo(Math.max(...D.docs.map(d=>d.mtime))) : 'none yet'],
+  D.env ? [D.env.label, D.env.up===null?'–':(D.env.up?'Online':'Not ready'), D.env.detail||''] : ['Runs', D.runs.length, D.runs.length? 'latest '+esc(D.runs[D.runs.length-1].name) : 'none yet'],
+];
+document.getElementById('kpis').innerHTML = kp.map(k=>`<div class="card kpi"><div class="l">${esc(k[0])}</div><div class="v" style="${String(k[1]).length>14?'font-size:16px;margin-top:8px':''}">${esc(k[1])}</div><div class="h">${esc(k[2])}</div></div>`).join('');
+
+// stepper
+const stp=document.getElementById('stepper');
+stp.style.setProperty('--n', Math.max(1,Math.min(D.stages.length,10)));
+stp.innerHTML = D.stages.length? D.stages.map((s,i)=>`<div class="step ${s.state}"><div class="bubble">${s.state==='done'?'✓':i+1}</div><div class="t">${esc(s.title)}</div><div class="d">${esc(s.detail)}</div><div class="c">${s.agents? s.done+'/'+s.agents+' agents':'&nbsp;'}</div></div>`).join('') : '<div class="empty" style="grid-column:1/-1">The stages appear when the first Workflow run starts.</div>';
+
+// roles (configured roles first, then any role seen in the agents but not configured)
+const roles = D.roles.slice();
+const known = new Set(roles.map(r=>r.key));
+agents.forEach(a=>{ if(a.role && !known.has(a.role)){ known.add(a.role); roles.push({key:a.role,name:a.role.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),model:'',desc:''}) }});
+let roleSel = S('role')||'', statusSel = S('status')||'';
+function renderRoles(){
+  document.getElementById('roles').innerHTML = `<div class="role ${roleSel?'':'sel'}" data-k=""><div class="avatar" style="background:var(--surface-2);color:var(--muted)">All</div><div><div class="n">Whole team</div><div class="d">${esc(D.team_note)}</div><div class="counts">${agents.length} agents</div></div></div>` +
+  roles.map(r=>{const mine=agents.filter(a=>a.role===r.key);const rn=mine.filter(a=>a.status==='running').length;const dn=mine.filter(a=>a.status==='done').length;
+  return `<div class="role ${roleSel===r.key?'sel':''}" data-k="${esc(r.key)}"><div class="avatar">${esc(initials(r.name))}</div><div style="min-width:0"><div class="n">${esc(r.name)} ${r.model?`<span class="tag">${esc(r.model)}</span>`:''}${rn?'<span class="pill running"><span class="spin"></span>'+rn+'</span>':''}</div>${r.desc?`<div class="d">${esc(r.desc)}</div>`:''}<div class="counts">${mine.length? dn+' done · '+rn+' running':'not started'}</div></div></div>`}).join('');
+  document.querySelectorAll('.role').forEach(el=>el.onclick=()=>{roleSel=el.dataset.k;S('role',roleSel);renderRoles();renderAgents()});
+}
+const open = new Set(JSON.parse(S('open')||'[]'));
+function renderAgents(){
+  const fs=[['','All'],['running','Running'],['done','Done'],['covered','Covered later'],['failed','Failed']].filter(f=>f[0]!=='covered'||agents.some(a=>a.status==='covered'));
+  document.getElementById('filters').innerHTML = fs.map(f=>`<button class="chip ${statusSel===f[0]?'on':''}" data-s="${f[0]}">${f[1]}</button>`).join('');
+  document.querySelectorAll('.chip').forEach(el=>el.onclick=()=>{statusSel=el.dataset.s;S('status',statusSel);renderAgents()});
+  const rName = Object.fromEntries(roles.map(r=>[r.key,r.name]));
+  document.getElementById('agentsTitle').textContent = roleSel? (rName[roleSel]||roleSel) : 'All agents';
+  const list = agents.filter(a=>(!roleSel||a.role===roleSel)&&(!statusSel||a.status===statusSel)).sort((a,b)=>(b.status==='running')-(a.status==='running')||(b.start||0)-(a.start||0));
+  if(!list.length){document.getElementById('agents').innerHTML='<tr><td class="empty">No agents yet</td></tr>';return}
+  document.getElementById('agents').innerHTML = '<tr><th>Status</th><th>Agent</th><th class="hide-sm">Role</th><th class="hide-sm">Model</th><th class="hide-sm">Workflow</th><th>Time</th></tr>' +
+    list.map(a=>{const st=a.status==='running'?'<span class="pill running"><span class="spin"></span>Running</span>':a.status==='failed'?'<span class="pill failed">Failed</span>':a.status==='covered'?'<span class="pill warn" title="This agent ended without a result; another agent finished its work">Covered later</span>':'<span class="pill done">Done</span>';
+    const row=`<tr class="row" data-id="${esc(a.id)}"><td>${st}</td><td><div style="font-weight:500">${esc(a.label)}${a.attempts?` <span class="tag" title="earlier attempts failed (network drop / usage limit)">attempt ${a.attempts}</span>`:''}</div><div class="muted" style="font-size:12px">${esc(a.phase||'')}</div></td><td class="hide-sm">${esc(rName[a.role]||a.role||'')}</td><td class="hide-sm"><span class="tag">${esc(a.model||'–')}</span></td><td class="hide-sm mono muted">${esc(a.wf||'')}</td><td class="mono" style="white-space:nowrap">${fmtDur(a.dur)}</td></tr>`;
+    const det = open.has(a.id)? `<tr class="detail"><td colspan="6">${esc(a.result|| (a.status==='running'?'Working… the result appears here when the agent finishes.':'No result returned.'))}</td></tr>`:'';
+    return row+det}).join('');
+  document.querySelectorAll('tr.row').forEach(el=>el.onclick=()=>{const id=el.dataset.id;open.has(id)?open.delete(id):open.add(id);S('open',JSON.stringify([...open]));renderAgents()});
+}
+renderRoles(); renderAgents();
+
+// environment
+if(D.env){
+  const E=D.env; document.getElementById('envBlock').hidden=false; document.getElementById('envTitle').textContent=E.label;
+  const items=[];
+  if(E.up!==null) items.push(`<div class="item"><div class="l">Status</div><div class="v">${E.up?'<span class="pill done">Online</span>':'<span class="pill warn">Not ready</span>'} <span class="muted" style="font-weight:400;font-size:12px">${esc(E.detail)}</span></div></div>`);
+  (E.links||[]).forEach(l=>items.push(`<div class="item"><div class="l">${esc(l.label)}</div><div class="v"><a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.text||String(l.url).replace(/^https?:\/\//,''))}</a></div></div>`));
+  (E.notes||[]).forEach(n=>items.push(`<div class="item"><div class="l">${esc(n.label)}</div><div class="v mono" style="font-weight:400">${esc(n.text)}</div></div>`));
+  if((E.containers||[]).length) items.push(`<div class="item"><div class="l">Containers</div><div class="v" style="font-weight:400">${E.containers.map(c=>`<span class="tag" title="${esc(c[1])}">${esc(c[0])}</span>`).join(' ')}</div></div>`);
+  document.getElementById('env').innerHTML = items.join('')||'<span class="muted">Nothing configured</span>';
+}
+
+// docs
+const docs = D.docs.slice().sort((a,b)=>a.path.localeCompare(b.path));
+if(docs.length) document.getElementById('docsBlock').hidden=false;
+let cur = decodeURIComponent((location.hash.match(/doc=([^&]+)/)||[])[1]||'') || S('doc') || '';
+function renderDocs(){
+  document.getElementById('doclist').innerHTML = docs.map(d=>`<div class="docitem ${d.path===cur?'sel':''}" data-p="${esc(d.path)}"><div class="t">${esc(d.title)}</div><div class="p">${esc(d.path)} · ${Math.max(1,Math.round(d.size/1024))} KB · ${fmtAgo(d.mtime)}</div></div>`).join('');
+  document.querySelectorAll('.docitem').forEach(el=>el.onclick=()=>{cur=el.dataset.p;S('doc',cur);history.replaceState(null,'','#doc='+encodeURIComponent(cur));S('vscroll','0');renderDocs()});
+  const d = docs.find(x=>x.path===cur);
+  const v = document.getElementById('viewer');
+  if(!d){v.innerHTML='<div class="empty">Select a document</div>';return}
+  const html = (window.marked&&window.DOMPurify)? DOMPurify.sanitize(marked.parse(d.md)) : '<pre>'+esc(d.md)+'</pre>';
+  v.innerHTML = `<div class="muted mono" style="padding-top:12px">${esc(d.path)}</div>`+html;
+  v.querySelectorAll('a[href]').forEach(a=>{a.target='_blank';a.rel='noopener'});
+}
+if(docs.length) renderDocs();
+
+// keep scroll position across reloads
+const sy=+S('scroll')||0, vy=+S('vscroll')||0; window.scrollTo(0,sy); document.getElementById('viewer').scrollTop=vy;
+addEventListener('scroll',()=>S('scroll',String(scrollY)),{passive:true});
+document.getElementById('viewer').addEventListener('scroll',e=>S('vscroll',String(e.target.scrollTop)),{passive:true});
+
+// auto refresh
+let paused = L('paused')==='1';
+const tb=document.getElementById('toggleRefresh');
+const setBtn=()=>tb.textContent=paused?'Resume auto-refresh':'Pause auto-refresh'; setBtn();
+tb.onclick=()=>{paused=!paused;L('paused',paused?'1':'0');setBtn()};
+if(D.refresh>0) setInterval(()=>{ if(!paused && !document.hidden) location.reload() }, Math.max(3,D.refresh)*1000);
+else tb.hidden=true;
+})();
+</script>
+</body>
+</html>
