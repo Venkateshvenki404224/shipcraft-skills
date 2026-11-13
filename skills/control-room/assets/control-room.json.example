@@ -1,0 +1,36 @@
+{
+  "_comment": "Copy to <project>/tools/control-room.json. Every key is optional; see references/config.md.",
+  "title": "Acme Store · Project control room",
+  "subtitle": "Online store rebuild · Django + React · built by an agent team",
+  "team_note": "You (product owner) · Claude (orchestrator)",
+  "output": "../control-room.html",
+  "refresh_seconds": 10,
+  "stages": [
+    {"title": "Research", "detail": "Competitors and constraints, each verified", "phases": ["Research"]},
+    {"title": "Plan", "detail": "PM writes the plan, a reviewer checks it", "phases": ["PRD", "Plan"]},
+    {"title": "Design", "detail": "Screens and API contract", "phases": ["Design", "Contract"]},
+    {"title": "Build", "detail": "Backend + frontend tickets", "phases": ["Build", "Backend", "Frontend"]},
+    {"title": "QA", "detail": "Security, feature and UI tests, fixes", "phases": ["QA", "Fix"]},
+    {"title": "Ship", "detail": "Clean runs, report, sign-off", "phases": ["Demo", "Ship"]}
+  ],
+  "roles": [
+    {"key": "pm", "name": "Project Manager", "model": "Fable", "desc": "Plan, report", "match": ["^pm\\b"]},
+    {"key": "be", "name": "Backend Developer", "model": "Opus", "desc": "APIs, data, security", "match": ["^backend", "^fix"]},
+    {"key": "fe", "name": "Frontend Developer", "model": "Opus", "desc": "Screens and components", "match": ["^frontend"]},
+    {"key": "ux", "name": "UI/UX Designer", "model": "Opus", "desc": "Design system, reviews", "match": ["^ui/ux", "^design"]},
+    {"key": "qa", "name": "QA", "model": "Opus", "desc": "Tests and security audit", "match": ["^qa"]},
+    {"key": "res", "name": "Researchers", "model": "Haiku", "desc": "Small focused research", "match": ["^research"]},
+    {"key": "ver", "name": "Verifier", "model": "Opus", "desc": "Adversarial checks", "match": ["^verify"]}
+  ],
+  "default_role": "pm",
+  "environment": {
+    "label": "Local stack",
+    "health": {"url": "http://127.0.0.1:8000/health", "expect": "ok", "ok_text": "health → ok"},
+    "compose_project": "acme-store",
+    "links": [{"label": "App", "url": "http://localhost:8000"}]
+  },
+  "docs": {"root": "..", "include": ["docs/**/*.md", "qa/**/*.md", "*.md"], "exclude": ["**/node_modules/**"]},
+  "superseded": {},
+  "covered": {},
+  "extra_agents": ""
+}

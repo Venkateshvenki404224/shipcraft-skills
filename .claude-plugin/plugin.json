@@ -1,8 +1,8 @@
 {
   "name": "shipcraft",
   "displayName": "Shipcraft",
-  "version": "0.4.0",
-  "description": "Nine skills and three agents for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, draw the design as reviewed Excalidraw diagrams, run a feature end to end through an agent pipeline with a live run board, and ship pull requests with reviewed screenshots. The agents implement, review and test Frappe changes.",
+  "version": "0.5.0",
+  "description": "Ten skills and three agents for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, draw the design as reviewed Excalidraw diagrams, run a feature end to end through an agent pipeline with a live run board, watch a team of agents in a live project control room, and ship pull requests with reviewed screenshots. The agents implement, review and test Frappe changes.",
   "author": {
     "name": "Venkatesh",
     "url": "https://github.com/Venkateshvenki404224"
@@ -19,7 +19,8 @@
     "diagrams",
     "pull-requests",
     "frappe",
-    "workflows"
+    "workflows",
+    "dashboard"
   ],
   "skills": [
     "./skills/wayfinder",
@@ -28,6 +29,7 @@
     "./skills/improve-codebase-architecture",
     "./skills/excalidraw-architecture",
     "./skills/work",
+    "./skills/control-room",
     "./skills/raise-pr",
     "./skills/pr-screenshots",
     "./skills/visual-reviewer"
