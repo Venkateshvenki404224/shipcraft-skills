@@ -19,6 +19,7 @@ Every key is optional. Relative paths are relative to the folder that holds the 
 | `run_names` | `{}` | `{"wf_…": "name"}` for runs whose script file is not `<name>-<run id>.js`. |
 | `superseded` | `{}` | `{"wf_…": "why it was stopped"}`. Running agents in that run show as failed with this reason. |
 | `covered` | `{}` | `{"<agent label>": "evidence"}`. Agents with that label that did not finish show as "Covered later" with the evidence. Only for work you verified. |
+| `include_runs` | `[]` | Regexes on the run name (script name) or run id. When set, only matching runs are shown: one page per project when several projects share a session. |
 | `extra_agents` | `""` | Path to a JSON list of agents run outside workflows: `{"id", "label", "phase", "role", "model", "status", "wf", "first", "result"}` (`first` is an ISO timestamp). |
 
 ## environment
