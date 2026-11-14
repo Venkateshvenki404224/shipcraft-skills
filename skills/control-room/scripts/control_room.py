@@ -47,6 +47,7 @@ DEFAULTS = {
     "superseded": {},
     "covered": {},
     "extra_agents": "",
+    "include_runs": [],
 }
 
 
@@ -165,8 +166,11 @@ def load_runs(sessions, cfg, now):
     names.update(cfg["run_names"])
     runs = []
     dirs = [d for s in sessions for d in glob.glob(os.path.join(s, "subagents", "workflows", "wf_*"))]
+    keep = [re.compile(p, re.I) for p in cfg.get("include_runs") or []]
     for d in sorted(dirs, key=os.path.getmtime):
         rid = os.path.basename(d)
+        if keep and not any(k.search(names.get(rid, rid)) or k.search(rid) for k in keep):
+            continue
         jp = os.path.join(d, "journal.jsonl")
         if not os.path.exists(jp):
             continue
