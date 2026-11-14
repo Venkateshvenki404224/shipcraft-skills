@@ -2,6 +2,14 @@
 
 `scripts/board/wfboard.py` + `scripts/board/dashboard.html`. It shows, live, every stage of the run: the owner's gates and inline stages from `.agent/state.json`, every workflow agent from the session's workflow journal (model, cost, time, last action, prompt, activity, result), the plan and evidence files, the UI before/after screenshots and the QA videos. It needs only Python 3; it reads files and never writes to the repo.
 
+The page uses the same design as the `control-room` skill, in light and dark:
+- **Header:** the run picker (R).
+- **KPI cards:** steps done, current stage, what waits on the owner, models and estimated cost.
+- **Stage stepper:** a step waiting on the owner pulses; click a step to filter by it.
+- **Team and steps:** the team list and a steps table with status filters. Click a row for that step's result, activity and prompt.
+- **Evidence:** cards that open the UI before/after review (side by side, slider, diff) and the QA videos.
+- **Deliverables:** a reader for the plan and evidence.
+
 ## Local session: live board
 
 Start it at intake, from the repo root, with the Bash tool's `run_in_background: true`:
