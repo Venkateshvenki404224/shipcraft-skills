@@ -19,28 +19,36 @@ import sys
 
 PHASES = ["Intake", "Plan", "Tests first", "Implement", "Gate + E2E", "Verify", "Agent QA", "UI + video", "Ship"]
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
-# The 18 stages of references/stages.md: (key, phase, title, who, deps). init writes them all as TODO.
+# The 25 stages of references/stages.md: (key, phase, title, who, deps). init writes them all as TODO.
 STAGES = [
     ("intake", "Intake", "Request, branch, manifest", "orchestrator", []),
     ("stack", "Intake", "App up, logins saved", "orchestrator", ["intake"]),
     ("research", "Plan", "Research", "agents", ["intake"]),
-    ("plan", "Plan", "Plan, tickets, test plan", "planner", ["research"]),
-    ("approve", "Plan", "Approval agent", "approver", ["plan"]),
+    ("prd", "Plan", "PM: product brief", "PM", ["research"]),
+    ("ceo-scope", "Plan", "CEO: scope and business fit", "CEO", ["prd"]),
+    ("plan", "Plan", "Architect: plan, tickets, test plan", "architect", ["ceo-scope"]),
+    ("design", "Plan", "UI/UX designer: design, CEO design review", "designer", ["plan"]),
+    ("feasibility", "Plan", "Senior developers: feasibility", "senior devs", ["plan"]),
+    ("pm-decisions", "Plan", "PM: decide the open questions", "PM", ["design", "feasibility"]),
+    ("approve", "Plan", "Verifier and approval agent", "verifier + approver", ["pm-decisions"]),
     ("h1", "Plan", "H1: owner approves the plan", "owner", ["approve"]),
-    ("tests", "Tests first", "Tests written", "agents", ["h1"]),
+    ("tests", "Tests first", "Tests written", "tester", ["h1"]),
     ("red", "Tests first", "Red run", "agent", ["tests"]),
     ("ui-before", "UI + video", "UI before screenshots", "agent", ["red"]),
-    ("implement", "Implement", "Tickets in dependency waves", "agents", ["red"]),
+    ("implement", "Implement", "Backend, frontend and UI developers, in dependency waves", "developers", ["red"]),
     ("gate", "Gate + E2E", "Gate and end-to-end tests", "agent", ["implement"]),
-    ("verify", "Verify", "Verify by risk tier", "agents", ["gate"]),
-    ("qa", "Agent QA", "Agent QA per role, on video", "agents", ["verify"]),
-    ("ui-after", "UI + video", "UI after screenshots and review", "agents", ["qa"]),
-    ("qa-fix", "Agent QA", "QA fix round", "agent", ["qa"]),
+    ("verify", "Verify", "Verify by risk tier", "verifiers", ["gate"]),
+    ("qa", "Agent QA", "Agent QA per role, on video", "QA", ["verify"]),
+    ("ui-after", "UI + video", "UI after screenshots, UI/UX designer review", "designer", ["qa"]),
+    ("qa-fix", "Agent QA", "QA fix round", "fixer", ["qa"]),
     ("evidence", "Ship", "Evidence report", "agent", ["qa-fix"]),
-    ("h2", "Ship", "H2: owner decides to ship", "owner", ["evidence"]),
+    ("pm-report", "Ship", "PM: acceptance report", "PM", ["evidence"]),
+    ("ceo-signoff", "Ship", "CEO: sign-off", "CEO", ["pm-report"]),
+    ("h2", "Ship", "H2: owner decides to ship", "owner", ["ceo-signoff"]),
     ("ship", "Ship", "Rebase, gate, ship checks, merge", "orchestrator", ["h2"]),
 ]
 NO_APP = {"stack", "ui-before", "ui-after"}
+TEAM = {"pm": {"prd", "pm-decisions", "pm-report"}, "ceo": {"ceo-scope", "ceo-signoff"}, "design": {"design"}, "senior": {"feasibility"}}
 
 
 def repo_root():
@@ -83,6 +91,7 @@ def main():
     i.add_argument("--session")
     i.add_argument("--issue")
     i.add_argument("--no-app", action="store_true", help="the project has no running app: stack and UI stages start as SKIP")
+    i.add_argument("--team-off", default="", help="comma list of team members the profile turns off (pm, ceo, design, senior, or all): their stages start as SKIP")
     for name in ("step", "set"):
         s = sub.add_parser(name)
         s.add_argument("key")
@@ -105,8 +114,12 @@ def main():
             old = json.load(open(PATH, encoding="utf-8"))
             if old.get("run") != a.run and not old.get("finished"):
                 sys.exit(f".agent/ belongs to unfinished run {old.get('run')!r}; refusing to overwrite")
+        off = {x.strip() for x in a.team_off.split(",") if x.strip()}
+        if "all" in off:
+            off = set(TEAM)
+        skip = (NO_APP if a.no_app else set()) | {k for m_ in off for k in TEAM.get(m_, set())}
         steps = [{"key": k, "num": k, "phase": ph, "title": t, "who": who, "deps": deps, "artifacts": [],
-                  "status": "SKIP" if a.no_app and k in NO_APP else "TODO"} for k, ph, t, who, deps in STAGES]
+                  "status": "SKIP" if k in skip else "TODO"} for k, ph, t, who, deps in STAGES]
         m = {"run": a.run, "name": a.name, "phases": PHASES, "steps": steps, "finished": False,
              "artifacts": [".agent/issue.md"]}
         if a.session:

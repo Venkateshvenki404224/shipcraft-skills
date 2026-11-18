@@ -258,11 +258,13 @@ def script_info(session_dir, run_id):
 def group_of(label, phase):
     pre, _, rest = label.partition(":")
     if phase == "Implement" and rest:
-        return rest, pre
+        return rest.strip(), pre.strip()
     if phase == "Approve":
         m = re.search(r"(\d+)$", label)
-        step = ("review " if pre == "approve" else "revise ") + (m.group(1) if m else "")
-        return "approval", step.strip()
+        n = m.group(1) if m else ""
+        if pre in ("approve", "plan"):  # labels of runs made before the agent team (approve:1, plan:rev1)
+            return "approval", (("review " if pre == "approve" else "revise ") + n).strip()
+        return "approval", f"{pre} {n}".strip()  # Verifier: plan r1, Approver: plan r1, Architect: revise r1
     return label, pre
 
 

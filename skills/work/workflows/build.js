@@ -1,6 +1,6 @@
 export const meta = {
   name: 'work-build',
-  description: '/work: tests first, implement, gate + E2E, verify, per-role agent QA on video, UI before/after review, evidence',
+  description: '/work: tests first, backend/frontend/UI developers by ticket, gate + E2E, verify, per-role agent QA on video, UI/UX designer review of before/after shots, evidence, PM acceptance report and CEO sign-off',
   whenToUse: 'Started by the /work skill after the owner approves the plan (H1). args: see the top of the script',
   phases: [
     { title: 'Tests first', detail: 'test tickets, then a red run that must fail for the right reason' },
@@ -12,6 +12,7 @@ export const meta = {
     { title: 'UI after', detail: 'after screenshots, diff and the UI review (ui runs only)' },
     { title: 'Fix', detail: 'one QA fix round for QA majors and unexpected/broken UI shots' },
     { title: 'Evidence', detail: 'writes .agent/evidence.md for the owner (H2)' },
+    { title: 'Sign-off', detail: 'PM checks every acceptance criterion; the CEO says SHIP or HOLD' },
   ],
 }
 
@@ -34,8 +35,25 @@ const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const W = (P.models && P.models.work) || 'sonnet'
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
+const AUTO = P.autonomy === 'agents'
+const M = P.models || {}
+const TEAM = P.team === false ? { pm: false, ceo: false, design: false } : (P.team || {})
+const PM_ON = TEAM.pm !== false, CEO_ON = TEAM.ceo !== false, DESIGN_ON = TEAM.design !== false
+const STACK = TEAM.stack || P.stack || ''
+const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
+const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
+
+// An agent that dies on an API error returns null: try it up to 3 times before giving up on that step.
+async function run(prompt, opts) {
+  for (let i = 0; i < 3; i++) {
+    const r = await agent(prompt, { ...opts, label: i ? `${opts.label} (retry ${i})` : opts.label })
+    if (r) return r
+    log(`${opts.label}: no result, attempt ${i + 1}/3`)
+  }
+  return null
+}
 
 const DONE = { type: 'object', properties: { ticket: { type: 'string' }, files_changed: { type: 'array', items: { type: 'string' } }, notes: { type: 'string' } }, required: ['ticket', 'files_changed', 'notes'] }
 const RED = { type: 'object', properties: { total: { type: 'integer' }, failing: { type: 'integer' }, passing_unexpectedly: { type: 'array', items: { type: 'string' } }, wrong_reason: { type: 'array', items: { type: 'string' } }, minutes: { type: 'number' } }, required: ['total', 'failing', 'passing_unexpectedly', 'wrong_reason', 'minutes'] }
@@ -78,7 +96,22 @@ const UIREV = {
   required: ['verdict', 'summary', 'counts', 'flagged'],
 }
 
-const ticketPrompt = (t) => `Implement ticket ${t.id} of ${NAME} run ${A.run}: ${t.title}
+const PMREP = { type: 'object', properties: { met: { type: 'integer' }, total: { type: 'integer' }, not_met: { type: 'array', items: { type: 'string' } }, entry_point_ok: { type: 'boolean' }, summary: { type: 'string' } }, required: ['met', 'total', 'not_met', 'entry_point_ok', 'summary'] }
+const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix'] }
+
+// Who builds a ticket: tickets.json "role" (the architect sets it); "kind": "test" is always the test engineer.
+const DEV = {
+  test: { who: 'Tester', brief: 'You are the test engineer. Write the tests only, from the test contract; no product code.' },
+  backend: { who: 'Backend dev', brief: `You are the backend developer${STACK ? ` (${STACK})` : ''}. Every endpoint and job checks who is calling and what they may do; validate input on the server; make writes idempotent where a retry or a double click can repeat them; follow how this codebase already does the same thing.` },
+  frontend: { who: 'Frontend dev', brief: `You are the frontend developer. Build the pages and components to .agent/ui/design.md when it exists; reuse the project's components${DESIGN_SYSTEM.length ? ` (${DESIGN_SYSTEM.join(', ')})` : ''}; escape every output; put the test contract's hooks on the right elements; every state (empty, loading, error, no permission) works.` },
+  ui: { who: 'UI dev', brief: `You are the UI developer. Follow .agent/ui/design.md exactly: layout, spacing, copy, every state, phone width 390 with no sideways scroll, dark mode, keyboard focus and screen-reader labels. Use the project's design system${DESIGN_SYSTEM.length ? ` (${DESIGN_SYSTEM.join(', ')})` : ''}; no new UI library.` },
+  data: { who: 'Data dev', brief: 'You are the data developer. Migrations are reversible or say why not; fixtures and seed data are marked as test data and removable; never touch real data.' },
+  docs: { who: 'Tech writer', brief: 'You are the technical writer. Write for the reader named in the ticket; short sentences; exact commands; no claims the code does not back.' },
+}
+const devOf = (t) => DEV[t.kind === 'test' ? 'test' : (t.role || (t.kind === 'docs' ? 'docs' : ''))] || { who: 'Developer', brief: 'You are the developer.' }
+
+const ticketPrompt = (t) => `${devOf(t).brief}
+Implement ticket ${t.id} of ${NAME} run ${A.run}: ${t.title}
 Files you own: ${(t.files || []).join(', ') || '(see plan)'}. Acceptance: ${(t.acceptance || []).join(' | ')}
 Read .agent/plan.md (design, test contract) and .agent/test-plan.json first. ${t.kind === 'test'
     ? 'Write the tests only. Use only the hooks and calls in the test contract; no product code.'
@@ -98,43 +131,44 @@ async function runTickets(list, phaseName) {
       if (files.some((f) => used.has(f))) continue
       files.forEach((f) => used.add(f)); batch.push(t)
     }
-    const out = await parallel(batch.map((t) => () => agent(ticketPrompt(t), { label: `${t.id}`, phase: phaseName, schema: DONE, model: t.model || W })))
+    const out = await parallel(batch.map((t) => () => run(ticketPrompt(t), { label: `${devOf(t).who}: ${t.id} ${t.title || ''}`.trim(), phase: phaseName, schema: DONE, model: t.model || W })))
     batch.forEach((t, i) => { done.add(t.id); left.splice(left.indexOf(t), 1); results.push(out[i] || { ticket: t.id, files_changed: [], notes: 'agent returned nothing' }) })
   }
   return results
 }
 
-const gate = (label, phaseName) => agent(
+const gate = (label, phaseName) => run(
   `Run the gate for ${NAME} run ${A.run} and report; do not fix anything.
 Gate commands, in order (stop at nothing; run them all):
 ${GATE || '(the profile lists no gate commands: run the project\'s linters and unit tests as its README or CI config describes, and say which)'}
 ${E2E ? `Then the end-to-end tests: ${E2E}
 Browsers expected: ${BROWSERS.join(', ')}. Per browser report PASS n/n, FAIL, or NOT RUN with the reason (a browser that is not installed is NOT RUN, never left out).` : 'There is no end-to-end command; report browsers as {}.'}
 If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.`,
-  { label, phase: phaseName, schema: GATE_RES, model: W, effort: 'low' })
+  { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: W, effort: 'low' })
 
-const fix = (label, phaseName, what) => agent(
+const fix = (label, phaseName, what) => run(
   `Fix round for ${NAME} run ${A.run}. Read .agent/plan.md. Fix these problems in the product code:
 ${JSON.stringify(what)}
 Never weaken an assertion, widen a timeout or delete a test to make it pass; if a test is wrong against the test contract, fix the test and say why.
 Return the files you changed. ${RULES}`,
-  { label, phase: phaseName, schema: DONE, model: W })
+  { label: `Fixer: ${label}`, phase: phaseName, schema: DONE, model: W })
 
 const snapCmd = (ph) => (A.uiSnap || '').split('{phase}').join(ph)
 const uiAfter = async (tag) => {
-  const cap = await agent(`Run the UI after capture: ${snapCmd('after')}
+  const cap = await run(`Run the UI after capture: ${snapCmd('after')}
 Report the counts printed by the teardown and any test that errored (an error is not a visual change). Do not change files.`,
-    { label: `ui-after${tag}`, phase: 'UI after', model: W, effort: 'low' })
-  const rev = await agent(
-    `You are the UI review agent for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md and .agent/ui/shots.json.
+    { label: `UI snap: after${tag}`, phase: 'UI after', model: W, effort: 'low' })
+  const designer = DESIGN_ON && A.ui
+  const rev = await run(
+    `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
 For every shot whose status is not "unchanged", open its before, marked (the after image with a red box around each changed area) and diff
 PNGs (paths are relative to .agent/ui/; "boxes" lists the changed areas) and judge each boxed area:
 expected = the change is in the plan; unexpected = a change the plan did not ask for; broken = overlap, clipping, sideways scroll,
-unreadable text, an empty state where data belongs, wrong data for the role. A final_path that differs from the page is a redirect: check it
+unreadable text, an empty state where data belongs, wrong data for the role${designer ? ', or a page that does not match .agent/ui/design.md (layout, copy, states, spacing, dark mode)' : ''}. A final_path that differs from the page is a redirect: check it
 against the project's access rules (${REVIEW_RULES}). Write .agent/ui/review.json:
 {"verdict":"PASS|CHANGES","summary":"one line","shots":{"<id>":{"verdict":"expected|unexpected|broken","note":"..."}}}
 verdict is PASS only if nothing is unexpected or broken. Return the same verdict, summary, counts per verdict and the flagged shots.`,
-    { label: `ui-review${tag}`, phase: 'UI after', schema: UIREV, model: RISK === 'high' ? 'opus' : W })
+    { label: `${designer ? 'UI/UX designer' : 'UI reviewer'}: shots${tag}`, phase: 'UI after', schema: UIREV, model: designer ? (M.design || M.plan || 'opus') : (RISK === 'high' ? 'opus' : W) })
   return { capture: cap, review: rev }
 }
 
@@ -150,7 +184,8 @@ and what this role must NOT see or reach. Save a screenshot per finding under .a
     : `The project has no app URL: explore through its real interface (CLI, API or library calls) as the plan describes. Try bad input,
 empty input, large input, repeated calls, interrupted runs and what this role must not be able to do. Record exact commands and outputs.`
   return `You are the agent-QA explorer for role "${role}" in ${NAME} run ${A.run}.
-Read .agent/plan.md (what changed and for whom) and .agent/test-plan.json (what the scripted tests already cover).
+Read .agent/plan.md (what changed and for whom)${PM_ON ? ', .agent/prd.md (the acceptance criteria and the entry point)' : ''} and .agent/test-plan.json (what the scripted tests already cover).
+Start where this role really starts (the home page or the signed-in landing page) and find the feature the way a user would; say if you cannot.
 ${browser}
 Rules: change only this role's own state;${APP.fixtures ? ` seed fixtures with \`${APP.fixtures}\` before and remove them after;` : ''} never print passwords or tokens;
 for each bug, check whether it also happens without the feature (existing_bug).
@@ -162,9 +197,9 @@ const result = { run: A.run, mode: A.mode || 'build', tickets: [], gates: [], fi
 if (A.mode === 'fixup') {
   // ------------------------------------------------ owner: "one more fix round, then ship"
   phase('Fix')
-  result.fixes.push(await fix('owner-fixup', 'Fix', { owner_themes: A.fixup && A.fixup.themes, findings: 'see .agent/evidence.md, .agent/qa/*.json, .agent/ui/review.json' }))
+  result.fixes.push(await fix('owner fixup', 'Fix', { owner_themes: A.fixup && A.fixup.themes, findings: 'see .agent/evidence.md, .agent/qa/*.json, .agent/ui/review.json' }))
   phase('Gate + E2E')
-  result.gates.push(await gate('gate:fixup', 'Gate + E2E'))
+  result.gates.push(await gate('fixup', 'Gate + E2E'))
   if (A.ui) { phase('UI after'); result.ui = await uiAfter(':fixup') }
 } else {
   // ------------------------------------------------ Tests first
@@ -173,22 +208,22 @@ if (A.mode === 'fixup') {
   const redPrompt = `Red run for ${NAME} run ${A.run}: the feature is not implemented yet, so the new tests must FAIL, each for the right reason
 (the missing feature, not a typo, a bad locator or a broken fixture). Run the new unit/script checks${E2E ? ` and: ${E2E}` : ''}
 (no retries; keep timeouts short). Compare each failure message with .agent/test-plan.json. Do not change files.`
-  let red = await agent(redPrompt, { label: 'red-run', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
+  let red = await run(redPrompt, { label: 'Gate: red run', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
   if (red && (red.passing_unexpectedly.length || red.wrong_reason.length)) {
     log(`red run: ${red.passing_unexpectedly.length} pass too early, ${red.wrong_reason.length} fail for the wrong reason; fixing the tests once`)
-    await agent(`Fix these tests so they fail only because the feature is missing (no product code): ${JSON.stringify({ passing: red.passing_unexpectedly, wrong: red.wrong_reason })}. ${RULES}`,
-      { label: 'fix-tests', phase: 'Tests first', schema: DONE, model: W })
-    red = await agent(redPrompt, { label: 'red-run:2', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
+    await run(`Fix these tests so they fail only because the feature is missing (no product code): ${JSON.stringify({ passing: red.passing_unexpectedly, wrong: red.wrong_reason })}. ${RULES}`,
+      { label: 'Tester: fix the red run', phase: 'Tests first', schema: DONE, model: W })
+    red = await run(redPrompt, { label: 'Gate: red run 2', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
   }
   result.red = red
 
   // ------------------------------------------------ UI before (base code still in place)
   if (A.ui) {
     phase('UI before')
-    result.uiBefore = await agent(`Run the UI before capture on the current code, before anything is implemented:
+    result.uiBefore = await run(`Run the UI before capture on the current code, before anything is implemented:
 ${snapCmd('before')}
 It reads .agent/ui/pages.json. Report the shot count and any errors. Do not change files.`,
-      { label: 'ui-before', phase: 'UI before', model: W, effort: 'low' })
+      { label: 'UI snap: before', phase: 'UI before', model: W, effort: 'low' })
   }
 
   // ------------------------------------------------ Implement
@@ -197,12 +232,12 @@ It reads .agent/ui/pages.json. Report the shot count and any errors. Do not chan
 
   // ------------------------------------------------ Gate + E2E, bounded fix loop
   phase('Gate + E2E')
-  let g = await gate('gate:1', 'Gate + E2E')
+  let g = await gate('run 1', 'Gate + E2E')
   result.gates.push(g)
   while (g && !g.green && result.rounds.build < BUDGET.build) {
     result.rounds.build++
-    result.fixes.push(await fix(`fix:build${result.rounds.build}`, 'Gate + E2E', g.failures))
-    g = await gate(`gate:${result.rounds.build + 1}`, 'Gate + E2E')
+    result.fixes.push(await fix(`gate round ${result.rounds.build}`, 'Gate + E2E', g.failures))
+    g = await gate(`run ${result.rounds.build + 1}`, 'Gate + E2E')
     result.gates.push(g)
   }
   if (g && !g.green) log(`gate still red after ${BUDGET.build} fix rounds; the owner decides`)
@@ -211,25 +246,25 @@ It reads .agent/ui/pages.json. Report the shot count and any errors. Do not chan
   phase('Verify')
   const LENSES = RISK === 'high' ? ['correctness and regressions', 'security, auth and role checks', 'UI rules, accessibility, phone widths'] : ['correctness and regressions']
   const verifyModel = RISK === 'low' ? W : 'opus'
-  const reviews = (await parallel(LENSES.map((lens) => () => agent(
+  const reviews = (await parallel(LENSES.map((lens) => () => run(
     `Review the uncommitted diff of ${NAME} run ${A.run} (git diff; new files included) through this lens: ${lens}.
 Read .agent/plan.md for intent and ${REVIEW_RULES}. Each finding cites a rule heading from those files, or names a concrete failing
 behaviour (input -> wrong output); anything else is an opinion: leave it out. Confirm every finding against the code before you report it:
 a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, with file:line. Change nothing.`,
-    { label: `verify:${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: verifyModel })))).filter(Boolean)
+    { label: `Verifier: ${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: M.verify && RISK !== 'low' ? M.verify : verifyModel })))).filter(Boolean)
   result.verify = reviews
   const serious = reviews.flatMap((r) => r.findings).filter((f) => f.severity === 'blocker' || f.severity === 'major' || f.severity === 'minor')
   if (serious.length && result.rounds.build < BUDGET.build) {
     result.rounds.build++
-    result.fixes.push(await fix(`fix:verify`, 'Verify', serious))
-    result.gates.push(await gate('gate:after-verify', 'Verify'))
+    result.fixes.push(await fix('verify findings', 'Verify', serious))
+    result.gates.push(await gate('after verify', 'Verify'))
   } else if (serious.length) log(`${serious.length} verify findings left: build budget used up`)
 
   // ------------------------------------------------ Agent QA, one explorer per role (on video when there is an app)
   phase('Agent QA')
   const qaRoles = ROLES.length ? ROLES : ['user']
-  const qa = (await parallel(qaRoles.map((role) => () => agent(qaPrompt(role),
-    { label: `qa:${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean)
+  const qa = (await parallel(qaRoles.map((role) => () => run(qaPrompt(role),
+    { label: `QA: ${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean)
   result.qa = qa
 
   // ------------------------------------------------ UI after + review
@@ -241,15 +276,15 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
   if ((qaMajors.length || uiFlags.length) && result.rounds.qa < BUDGET.qa) {
     phase('Fix')
     result.rounds.qa++
-    result.fixes.push(await fix('fix:qa', 'Fix', { qa: qaMajors, ui: uiFlags }))
-    result.gates.push(await gate('gate:after-qa', 'Fix'))
+    result.fixes.push(await fix('QA findings', 'Fix', { qa: qaMajors, ui: uiFlags }))
+    result.gates.push(await gate('after QA', 'Fix'))
     if (A.ui) result.uiRecheck = await uiAfter(':recheck')
   } else if (qaMajors.length || uiFlags.length) log('QA findings left: QA budget used up; they go to the owner')
 }
 
 // ------------------------------------------------ Evidence
 phase('Evidence')
-result.evidence = await agent(
+result.evidence = await run(
   `Write .agent/evidence.md for the owner's ship decision (H2) on ${NAME} run ${A.run}, from the files in .agent/ and this result:
 ${JSON.stringify(result)}
 Sections: what was built (plain words); test results as a role x browser table with NOT RUN where a browser did not run, plus flakes by name;
@@ -257,5 +292,24 @@ gate table; verification verdict and what was fixed; agent QA counts and open fi
 UI before/after: every non-unchanged shot with its verdict (if .agent/ui/shots.json exists); videos: every file under .agent/video/ with role
 and kind; fix rounds used vs budget; stages with time; cost marked "estimated" unless measured; files touched (git status).
 Short sentences, no hype. Return the first 3 lines of the file.`,
-  { label: 'evidence', phase: 'Evidence', model: W })
+  { label: 'Evidence: report', phase: 'Evidence', model: W })
+
+// ------------------------------------------------ Sign-off: PM acceptance report, CEO ship call
+if (PM_ON || CEO_ON) phase('Sign-off')
+if (PM_ON) {
+  result.pmReport = await run(
+    `You are the product manager for ${NAME} run ${A.run}. Check what was built against the brief, as a user would.
+Read .agent/prd.md (acceptance criteria and entry point), .agent/pm.md (your decisions), .agent/evidence.md, .agent/qa/*.json${A.ui ? ', .agent/ui/review.json' : ''}.
+For each acceptance criterion: met, partly or not met, with the evidence (a test id, a QA step, a screenshot or a video). Check the entry point: can a user find
+the feature from where they already are? Write .agent/pm-report.md in plain words for the owner, with a table of the criteria. Return the counts.`,
+    { label: 'PM: acceptance report', phase: 'Sign-off', schema: PMREP, model: M.pm || M.plan || 'opus' })
+}
+if (CEO_ON) {
+  result.signoff = await run(
+    `You are the CEO of ${NAME}.${BUSINESS} Decide whether run ${A.run} is ready to ship.
+Read .agent/ceo.md (your scope, must-haves and never-claim list)${PM_ON ? ', .agent/pm-report.md' : ''}, .agent/evidence.md and .agent/qa/*.json.
+SHIP when the must-haves are in, the gate is green, nothing blocker or major is open and nothing in the product promises what it does not do. Otherwise HOLD,
+with must_fix: the exact items to fix before it ships. Write .agent/ceo-signoff.md (verdict, reasons, must_fix). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
+    { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: M.ceo || M.plan || 'opus' })
+}
 return result

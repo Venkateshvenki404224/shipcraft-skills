@@ -1,6 +1,6 @@
 # Pipeline rules
 
-The planner, the approval agent and the orchestrator follow these rules. They come from real runs of this pipeline; each rule names the failure it prevents.
+The architect, the verifier, the approval agent and the orchestrator follow these rules (the team's roles are in `team.md`). They come from real runs of this pipeline; each rule names the failure it prevents.
 
 ## Plan check
 
@@ -12,8 +12,13 @@ The owner sees the plan only after it passes these checks (the approval agent ru
 - **Cross-page state and role-gated steps are listed.** A feature that navigates gets tests for state that crosses pages: resume, Back, reload, Esc on a later page. A step that only some roles see gets a test that it is skipped for the others.
 - **Tickets that share a file depend on each other**, and test tickets come before implementation tickets.
 - **The risk tier fits.** Shared layout, auth, session, payment and data-migration code is at least medium.
+- **Every acceptance criterion in `prd.md` maps to a ticket**, the entry point is a ticket, and nothing contradicts the CEO's cuts, must-haves or never-claim list in `ceo.md`.
+- **Every ticket names its developer `role`** (backend, frontend, ui, data, docs, test), so it gets the right prompt and label.
+- **The verifier and the approval agent both approve.** The verifier attacks the plan against the code and fixes small certain mistakes in place; the approval agent checks these rules.
 
 ## Owner gates
+
+With `"autonomy": "agents"` in the profile, the agent team stands in for the owner at both gates (SKILL.md, "Unattended runs"). Otherwise:
 
 - **H1 (plan):** "Approve", "Approve with changes: <text>" (one re-plan that applies the text, then build, with no second H1), or "Stop".
 - **H2 (evidence):** "Ship", "Fix then ship: <themes>", or "Stop". "Fix then ship" is a conditional approval: one extra fix round on those themes, even past the budget, because the owner chose to go over it. Then the gate and the full end-to-end suite run again. If both are green, ship with no second ask. Otherwise stop and report again.

@@ -28,6 +28,15 @@
   "ui_snap": { "dir": "tests/e2e/ui-snap", "theme_key": null, "hide": [".cookie-banner"], "channel": null },
   "video": true,
 
-  "models": { "plan": "opus", "approve": "opus", "research": "sonnet", "work": "sonnet" },
-  "ship": { "mode": "pr" }
+  "team": {
+    "stack": "Next.js",
+    "business": "Acme sells a scheduling app to small clinics, monthly plans",
+    "design_system": ["src/components/ui", "src/styles"],
+    "pm": true, "ceo": true, "design": true, "senior": true
+  },
+  "autonomy": "owner",
+
+  "models": { "plan": "opus", "approve": "opus", "research": "sonnet", "work": "sonnet",
+              "pm": "opus", "ceo": "opus", "design": "opus", "senior": "opus", "verify": "opus" },
+  "ship": { "mode": "pr", "auto_push": false }
 }
