@@ -17,8 +17,9 @@ When `.claude/work.json` is missing (or the owner says `/work setup`):
 2. **Draft** `.claude/work.json` from what you found. Leave out what does not apply: no `app` for a library or CLI (no screenshots, no video; QA uses the CLI or API); no `e2e` when there is none (the gate is the test suite). Mark each value you inferred rather than found in the summary you show the owner.
 3. **Project review rules.** If `CLAUDE.md` or the docs hold rules a reviewer should enforce (access rules, naming, security patterns), copy them into `.claude/work-review-rules.md` in the shape of `assets/work-review-rules.md.example`, each with its reason, and set `review_rules`. Otherwise leave `review_rules` out.
 4. **Check the commands.** Run `app.check` and each `gate` command once. Record which pass on the base branch: a gate that is red before the feature starts must be known now, not found at H2.
-5. **Show the owner** the profile as a table (field, value, found/inferred) and ask with AskUserQuestion: "Use it" / "Change it" / "Stop". Ask also, only when you could not tell: the ship mode (`pr`: push the branch and open a pull request; `squash`: squash onto the base branch locally, then ask before the push) and the plan model.
-6. Commit the profile on its own (`chore: add /work profile`) only when the owner says so; otherwise leave it uncommitted and use it.
+5. **The agent team.** Fill `team` from what you found: `stack` (the main framework, for example "Frappe", "Django", "Next.js"; it adds a `Senior <stack> dev`), `business` (one line: what the product sells and to whom, from the README or site), `design_system` (the folders of the project's own UI components and styles, when it has any). Leave the team on unless the owner says otherwise; `"team": false` is the lean pipeline.
+6. **Show the owner** the profile as a table (field, value, found/inferred) and ask with AskUserQuestion: "Use it" / "Change it" / "Stop". Ask also, only when you could not tell: the ship mode (`pr`: push the branch and open a pull request; `squash`: squash onto the base branch locally, then ask before the push), the plan model, and whether runs are attended (`autonomy: "owner"`, the default) or unattended (`"agents"`). Never set `"agents"` without the owner saying so.
+7. Commit the profile on its own (`chore: add /work profile`) only when the owner says so; otherwise leave it uncommitted and use it.
 
 ## Fields
 
@@ -38,5 +39,8 @@ When `.claude/work.json` is missing (or the owner says `/work setup`):
 | `e2e.cmd` (`{specs}`), `e2e.full`, `e2e.browsers` | gate, red run, ship | browsers not run are reported NOT RUN |
 | `ui_snap.dir`, `theme_key`, `hide`, `channel` | UI layer | `dir` must be inside the e2e package so Playwright resolves; `channel: "chrome"` uses the installed Chrome |
 | `video` | QA | false to never record |
-| `models` | workflows | `plan`, `approve`, `research`, `work`; aliases such as `opus`, `sonnet`, `fable` |
+| `models` | workflows | `plan`, `approve`, `research`, `work`, and for the team `pm`, `ceo`, `design`, `senior`, `verify` (each falls back to `plan` or `approve`); aliases such as `opus`, `sonnet`, `fable` |
+| `team` | plan, build | `false` = lean pipeline; or `{pm, ceo, design, senior}` as `false` to turn one off; `senior` may be a list of reviewer names; `stack`, `business`, `design_system` (`references/team.md`) |
+| `autonomy` | gates, ship | `owner` (default): the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs") |
 | `ship.mode` | ship | `pr` (default) or `squash` |
+| `ship.auto_push` | ship | with `autonomy: agents` only: push the run branch after each commit (never the base branch, never a PR) |

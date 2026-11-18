@@ -1,6 +1,6 @@
 ---
 name: work
-description: Build a feature end to end with an agent pipeline, in any repository, and show it live on a run board. Starts from a GitHub issue number, an issue URL, or a plain-text request. It writes a run-specific workflow from its templates and runs it - research, a plan, an approval agent, the owner's approval, tests first, implementation, the gate and E2E, verification, per-role agent QA recorded on video, UI before/after screenshots when the UI changes, an evidence report, and the owner's ship decision. Every stage shows on the run board (dashboard.html; an Artifact in cloud sessions) and in a stage table. Use whenever the owner says "/work", "work on", "use the work skill", or "implement issue N". Also use it to continue a run - "/work approve", "/work ship", "/work status" - or to set a repo up for it - "/work setup".
+description: Build a feature end to end with an agent pipeline, in any repository, and show it live on a run board. Starts from a GitHub issue number, an issue URL, or a plain-text request. It writes a run-specific workflow from its templates and runs it with an agent team - research, a PM brief, a CEO scope check, an architect's plan, a UI/UX design, senior developer feasibility, PM decisions, a verifier and an approval agent, the owner's approval, tests first, implementation by backend, frontend and UI developers, the gate and E2E, verification, per-role agent QA recorded on video, UI before/after screenshots reviewed by the designer when the UI changes, an evidence report, a PM acceptance report, a CEO sign-off, and the owner's ship decision. Every stage shows on the run board (dashboard.html; an Artifact in cloud sessions) and in a stage table. Use whenever the owner says "/work", "work on", "use the work skill", or "implement issue N". Also use it to continue a run - "/work approve", "/work ship", "/work status" - or to set a repo up for it - "/work setup".
 ---
 
 # /work: the feature pipeline
@@ -47,10 +47,10 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 5. **Manifest.** Run:
 
    ```
-   python3 $S/scripts/state.py init --run <branch> --name "<title>" [--issue <n>] [--session <this session id, if known>] [--no-app]
+   python3 $S/scripts/state.py init --run <branch> --name "<title>" [--issue <n>] [--session <this session id, if known>] [--no-app] [--team-off pm,ceo,design,senior|all]
    ```
 
-   It writes `.agent/state.json` with all 18 stages as TODO (`--no-app` marks the app stages SKIP when the profile has no `app`). Mark `intake` DONE.
+   It writes `.agent/state.json` with all 25 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
 6. **Board.** Start it now, before any agent runs (`references/board.md`):
    - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Read its first line and give the owner the URL.
    - Cloud session (`CLAUDE_CODE_REMOTE` is set, or the owner cannot open localhost): write the snapshot (`--snapshot .agent/board.html`) and publish it with the Artifact tool; give the owner the link.
@@ -68,11 +68,21 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    Pass the date from your context; scripts cannot read the clock.
 3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. The workflow shows on the board on its own while it runs.
 
-The workflow researches in parallel, has the planner write `.agent/plan.md`, `tickets.json` and `test-plan.json` (plus `ui/pages.json` when the UI changes), and runs the approval agent with up to 2 revisions. It returns `{scope, plan, approval}`.
+The workflow runs the agent team (`references/team.md`):
+1. **Research** in parallel (one reader per area, plus outside facts).
+2. **PM: product brief** → `.agent/prd.md` (acceptance criteria, entry point, non-goals). **CEO: scope** → `.agent/ceo.md` (GO / CUT / NO_GO, must-haves, never-claim list).
+3. **Architect: plan** → `plan.md`, `tickets.json` (each ticket has a developer `role`), `test-plan.json`, `ui/pages.json` when the UI changes.
+4. **UI/UX designer** → `.agent/ui/design.md` (UI runs), then **CEO: design review** (one revision).
+5. **Senior developers: feasibility** (`Senior dev`, plus `Senior <stack> dev` when the profile names a stack), in parallel.
+6. **PM: decisions** → `.agent/pm.md` answers every open question and every developer issue; **Architect: apply decisions**.
+7. **Verifier** (adversarial, fixes small mistakes in place) and **approval agent** in parallel; both must APPROVE; up to 2 revisions.
 
-- Set `research`, `plan` and `approve` from the result, with one-line summaries and the files as `--artifact` (they then open on the board).
-- If approval is still REVISE after 2 rounds, report the open issues to the owner. Do not hide them.
-- **H1.** Set `h1` to WAIT. Refresh the board (republish the snapshot in a cloud session). In chat, print the stage table (`state.py show`) and the plan summary: tickets, test count, risk tier, `ui`, open questions with their defaults, and the approval agent's verdict. Ask with AskUserQuestion: "Approve" / "Approve with changes" / "Stop". Set `h1` DONE when approved. If the owner leaves, the run resumes later with `/work approve`.
+It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan, approval, verifier, team, autonomy, stopped}`.
+
+- Set `research`, `prd`, `ceo-scope`, `plan`, `design`, `feasibility`, `pm-decisions` and `approve` from the result, with one-line summaries and the files as `--artifact` (they then open on the board). A member the profile turned off, or `design` on a run without UI, is SKIP.
+- **CEO NO_GO** (`stopped: "ceo"`): the workflow stops before the plan. Show the owner `.agent/ceo.md` and ask "Build anyway" / "Change the request" / "Stop". "Build anyway" re-runs plan.js with `profile.team.ceo` set to false for this run.
+- If the verifier or the approval agent still says REVISE after 2 rounds, report the open issues to the owner. Do not hide them.
+- **H1.** Set `h1` to WAIT. Refresh the board (republish the snapshot in a cloud session). In chat, print the stage table (`state.py show`) and the plan summary: the CEO's verdict and cuts, the PM's acceptance criteria and decisions (`pm.md`), tickets by developer role, test count, risk tier, `ui` and the design summary, the senior developers' verdicts, any question still open, and the verifier's and approval agent's verdicts. Ask with AskUserQuestion: "Approve" / "Approve with changes" / "Stop". Set `h1` DONE when approved. If the owner leaves, the run resumes later with `/work approve`.
 
 ## 3. Build workflow (after H1)
 
@@ -86,7 +96,7 @@ The workflow researches in parallel, has the planner write `.agent/plan.md`, `ti
    - `budgets: {build: 2, qa: 1}`.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
-4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `evidence`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
+4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
 5. **When the Workflow tool is missing** (a headless run), run the same stages with the Agent tool, in the order and with the prompts in `references/stages.md`, and record each stage as it finishes so the board stays current.
 
 ## 4. Media layers
@@ -105,6 +115,7 @@ Set `h2` to WAIT and refresh the board. Show the owner, in chat:
 - gate results and the verify verdict;
 - QA counts and open findings;
 - UI shots that changed, with their verdicts, and the videos (on the board);
+- the PM's acceptance report (criteria met / not met, entry point) and the CEO's sign-off (SHIP or HOLD, with must-fix items);
 - time per stage, and cost, labelled as estimated unless billed per token;
 - the board link.
 
@@ -132,10 +143,20 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    End the commit message with the attribution lines the session gives you.
 4. Run `state.py step ship --status DONE` and `state.py finish`. Refresh the board one last time. If the run came from an issue, offer to comment the link on it. Do not comment unasked.
 
+## Unattended runs (`"autonomy": "agents"`)
+
+Only when the profile says `"autonomy": "agents"` (the owner wrote it, so it is their standing OK). The agent team then stands in for the owner:
+- **H1** passes when the verifier and the approval agent both APPROVE, after the PM's decisions. If they still say REVISE after 2 rounds, stop and report.
+- **H2** passes when the gate is green and the CEO signs off SHIP. A CEO HOLD gets one fix round on its `must_fix` items (build.js `mode: "fixup"`), then a second sign-off; still HOLD = stop and report.
+- **Ship** = commit on the run branch, in small commits. Push the branch only when `ship.auto_push` is true. Never merge into the base branch, never open a pull request, never post anywhere: those wait for the owner.
+- Log every decision the owner would have made, with the reason and any dissent, in `.agent/decisions.md`, and mark the gates `DONE` with "agents" in the summary.
+- A model that does not answer (an agent hangs or returns nothing three times): change that role's model in the args, say so in `decisions.md`, and go on.
+
 ## Rules that always apply
 
-- **Owner gates are never skipped.** Nothing is pushed without the owner's yes.
+- **Owner gates are never skipped** in the default `"autonomy": "owner"`. Nothing is pushed without the owner's yes; with `"agents"`, only the run branch, and only with `ship.auto_push`.
 - **The board and the table stay current.** Every stage you start or finish goes through `state.py`; in a cloud session, republish the snapshot at H1, after QA and at H2.
+- **The team.** Agents are labelled "<Role>: <task>" (PM, CEO, Architect, UI/UX designer, Senior dev, Backend dev, Frontend dev, UI dev, Tester, Verifier, QA, Fixer), so the board shows who did what. Every agent call is retried up to 3 times when it returns nothing. `references/team.md` has each role's job and output.
 - **Budgets:** build/verify fix rounds stop at 2; QA fix rounds stop at 1. When a budget runs out, stop and ask. Never loop silently.
 - **Browsers.** A browser that did not run is reported as NOT RUN, never dropped. A test that fails once and then passes is a flake: repeat it 20 times and name it in the evidence.
 - **QA scope.** QA agents change only their own role's state. They seed fixtures before they start and remove them afterwards.
