@@ -5,7 +5,7 @@ write real defaults into the profile instead of shipping hardcoded ones.
   python3 detect_models.py            -> JSON on stdout
 
 Hosts: Claude Code (terminal, VS Code/Cursor extension, desktop app), Codex
-(terminal, VS Code extension), Copilot CLI (terminal, `gh copilot`). Each host
+(terminal, VS Code extension), Copilot CLI (terminal, `gh copilot`; its catalog is read over `copilot --acp`). Each host
 is found on PATH first, then inside the app or editor extension that bundles it.
 
 Output: {"host": "claude|codex|copilot|unknown", "hosts_found": [...],
@@ -115,9 +115,47 @@ def codex():
     return b, models, configured, src
 
 
+def acp_models(cmd, timeout=30):
+    """Ask `copilot --acp` (Agent Client Protocol, JSON-RPC over stdio) for its catalog. session/new returns
+    models.availableModels for the signed-in account; no prompt is sent, so no model is called."""
+    import select, time
+    try:
+        p = subprocess.Popen(cmd + ["--acp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, cwd="/tmp")
+    except Exception:
+        return []
+
+    def call(i, method, params):
+        p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": i, "method": method, "params": params}) + "\n")
+        p.stdin.flush()
+        end = time.time() + timeout
+        while time.time() < end:
+            if select.select([p.stdout], [], [], 1)[0]:
+                line = p.stdout.readline()
+                if not line:
+                    return None
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                if m.get("id") == i:
+                    return m.get("result")
+        return None
+
+    try:
+        call(1, "initialize", {"protocolVersion": 1, "clientCapabilities": {}})
+        res = call(2, "session/new", {"cwd": "/tmp", "mcpServers": []}) or {}
+        out = []
+        for m in (res.get("models") or {}).get("availableModels", []):
+            if (m.get("_meta") or {}).get("copilotEnablement", "enabled") == "enabled" and m.get("modelId") not in out:
+                out.append(m["modelId"])
+        return out
+    except Exception:
+        return []
+    finally:
+        p.kill()
+
+
 def copilot():
-    # Copilot CLI has no model-list command (`/model` is interactive, and an admin may pin 'auto').
-    # 'auto' is documented in `copilot --help`; the configured model is read from its config.
     cmd = find_copilot()
     configured = None
     for name in ("config.json", "settings.json"):
@@ -129,12 +167,10 @@ def copilot():
             pass
     models, src = [], "none"
     if cmd:
-        help_text = run(cmd + ["--help"])
-        if "--model" in help_text:
-            models = ["auto"] if "'auto'" in help_text else []
-            if configured and configured not in models:
-                models.append(configured)
-            src = "%s --help and ~/.copilot config (no list command; /model is interactive)" % " ".join(cmd[:2])
+        models = acp_models(cmd)
+        src = "%s --acp (session/new availableModels)" % " ".join(cmd[:2])
+        if not models and "--model" in run(cmd + ["--help"]):  # older build without ACP: 'auto' is documented
+            models, src = ["auto"], "%s --help ('auto' only; /model is interactive)" % " ".join(cmd[:2])
     return (cmd[0] if cmd else None), models, configured, src
 
 
@@ -163,8 +199,6 @@ def main():
         note = "%s is the running host but its binary was not found: ask the owner which models it offers." % host
     elif not cur.get("models"):
         note = "The host gave no model list: ask the owner which models to use."
-    elif host == "copilot":
-        note = "Copilot lists models only in its interactive /model: add the ones the owner uses."
     json.dump({"host": host, "hosts_found": found, "by_host": by_host, "models": cur.get("models", []),
                "configured": cur.get("configured"), "source": cur.get("source", "none"), "note": note}, sys.stdout, indent=2)
     print()
