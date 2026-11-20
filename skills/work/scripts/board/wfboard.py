@@ -633,6 +633,33 @@ def export_video(root, base, run_id):
     return out
 
 
+_app_seen = {}
+
+
+def app_info(root, now):
+    paths = [os.environ.get("WORK_PROFILE") or "", os.path.join(root, ".work-profile", "work.json"), os.path.join(root, ".claude", "work.json")]
+    prof = next((p for p in paths if p and os.path.isfile(p if os.path.isabs(p) else os.path.join(root, p))), None)
+    if not prof:
+        return None
+    try:
+        app = json.load(open(prof if os.path.isabs(prof) else os.path.join(root, prof), encoding="utf-8")).get("app") or {}
+    except Exception:
+        return None
+    url = app.get("url")
+    if not url:
+        return None
+    seen = _app_seen.get(url)
+    if not seen or now - seen[0] > 15:
+        try:
+            import urllib.request
+            code = urllib.request.urlopen(url, timeout=2).status
+        except Exception as e:
+            code = getattr(e, "code", None)
+        seen = (now, bool(code) and int(code) < 500)
+        _app_seen[url] = seen
+    return {"url": url, "up": seen[1], "start": app.get("start") or ""}
+
+
 def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     m = json.load(open(manifest, encoding="utf-8"))
     linked = workflow_agents(wf_runs, m.get("run"))
@@ -761,6 +788,7 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     cols = list(m.get("phases") or []) + [p for p in dict.fromkeys(g["phase"] for g in groups) if p not in (m.get("phases") or [])]
     return {"id": run_id, "name": m.get("name") or m.get("run") or run_id, "state": state, "events": [],
             "phases": cols, "groups": groups, "artifacts": arts, "agents": n_agents, "running": n_running,
+            "app": app_info(root, now),
             "ui": export_ui(root, base, run_id),
             "videos": export_video(root, base, run_id),
             "cost": round(total_cost, 2), "started": first, "updated": last,

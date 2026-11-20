@@ -54,7 +54,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 6. **Board.** Start it now, before any agent runs (`references/board.md`):
    - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Read its first line and give the owner the URL.
    - Cloud session (`CLAUDE_CODE_REMOTE` is set, or the owner cannot open localhost): write the snapshot (`--snapshot .agent/board.html`) and publish it with the Artifact tool; give the owner the link.
-7. **App.** When the profile has `app`: run `app.check`. If the result is not `app.expect`, run `app.start` (tell the owner it takes about `app.start_minutes`), then check again. Then run `app.login` so each role's saved login exists. Record the result as the `stack` step.
+7. **App.** When the profile has `app`: run `app.check`. If the result is not `app.expect`, run `app.start` (tell the owner it takes about `app.start_minutes`), then check again. Then run `app.login` so each role's saved login exists. Record the result as the `stack` step. Give the owner the app's address (`app.url`) next to the board link, every time you give the board link; the board also shows it at the top with whether it answers.
 
 ## 2. Plan workflow → H1
 
