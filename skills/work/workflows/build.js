@@ -48,6 +48,7 @@ const PM_ON = TEAM.pm !== false, CEO_ON = TEAM.ceo !== false, DESIGN_ON = TEAM.d
 const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
+const FEATURE_MAP = P.feature_map || ''
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
 
@@ -166,7 +167,7 @@ Report the counts printed by the teardown and any test that errored (an error is
     { label: `UI snap: after${tag}`, phase: 'UI after', model: W, effort: 'low' })
   const designer = DESIGN_ON && A.ui
   const rev = await run(
-    `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
+    `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${FEATURE_MAP ? `, the screen names in ${FEATURE_MAP}` : ''}${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
 For every shot whose status is not "unchanged", open its before, marked (the after image with a red box around each changed area) and diff
 PNGs (paths are relative to .agent/ui/; "boxes" lists the changed areas) and judge each boxed area:
 expected = the change is in the plan; unexpected = a change the plan did not ask for; broken = overlap, clipping, sideways scroll,
@@ -190,7 +191,7 @@ and what this role must NOT see or reach. Save a screenshot per finding under .a
     : `The project has no app URL: explore through its real interface (CLI, API or library calls) as the plan describes. Try bad input,
 empty input, large input, repeated calls, interrupted runs and what this role must not be able to do. Record exact commands and outputs.`
   return `You are the agent-QA explorer for role "${role}" in ${NAME} run ${A.run}.
-Read .agent/plan.md (what changed and for whom)${PM_ON ? ', .agent/prd.md (the acceptance criteria and the entry point)' : ''} and .agent/test-plan.json (what the scripted tests already cover).
+Read .agent/plan.md (what changed and for whom)${PM_ON ? ', .agent/prd.md (the acceptance criteria and the entry point)' : ''}${FEATURE_MAP ? `, ${FEATURE_MAP} (every screen and action by name: name things the same way in your findings, and report a screen the map lists that you cannot reach)` : ''} and .agent/test-plan.json (what the scripted tests already cover).
 Start where this role really starts (the home page or the signed-in landing page) and find the feature the way a user would; say if you cannot.
 ${browser}
 Rules: change only this role's own state;${APP.fixtures ? ` seed fixtures with \`${APP.fixtures}\` before and remove them after;` : ''} never print passwords or tokens;

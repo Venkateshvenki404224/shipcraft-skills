@@ -27,6 +27,8 @@ A /work run is staffed like a small product company. Each agent has one job, wri
 | **PM** (acceptance) | Sign-off | `pm` | `prd.md`, `pm.md`, evidence, QA | `.agent/pm-report.md` | each acceptance criterion met / partly / not met, with evidence; the entry point works |
 | **CEO** (sign-off) | Sign-off | `ceo` | `ceo.md`, `pm-report.md`, evidence, QA | `.agent/ceo-signoff.md` | SHIP or HOLD with must-fix items. With `autonomy: agents` this replaces H2 |
 
+With a `feature_map` in the profile, the architect, the designer, QA and the UI review all read it, so the owner and every agent call each screen and action by the same name.
+
 ## Why each role is there
 
 - **PM before the plan.** Without acceptance criteria and an entry point, plans ship features nobody can find ("I don't see it in the UI"). The PM's brief is what QA and the sign-off check against.

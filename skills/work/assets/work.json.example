@@ -27,6 +27,7 @@
   },
   "ui_snap": { "dir": "tests/e2e/ui-snap", "theme_key": null, "hide": [".cookie-banner"], "channel": null },
   "video": true,
+  "feature_map": "docs/features.md",
 
   "team": {
     "stack": "Next.js",
