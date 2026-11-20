@@ -870,7 +870,22 @@ def export_once(project_dirs, pipeline_globs):
                 runs.append({"id": "pl_" + os.path.basename(os.path.dirname(os.path.dirname(p))), "name": p, "state": "error",
                              "error": f"{p}: {e}", "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0,
                              "cost": 0, "elapsed": 0})
+        seen, uniq = set(), []
+        for r in runs:
+            if r["id"] in seen:
+                continue
+            seen.add(r["id"])
+            uniq.append(r)
+        runs = uniq
         runs.extend(wf_runs)
+        for r in runs:
+            by = {}
+            for g in r.get("groups", []):
+                for a in g.get("agents", []):
+                    m = a.get("model")
+                    if m and not str(m).startswith("<") and a.get("cost"):
+                        by[m] = round(by.get(m, 0) + a["cost"], 4)
+            r["cost_by_model"] = by
         for r in runs:
             r.pop("_prompt_head", None)
             r.pop("_args_run", None)
@@ -984,9 +999,109 @@ def project_dirs_for(repo, cwd):
     return out
 
 
+REPO = None
+MODEL_KEYS = ("plan", "approve", "research", "work", "pm", "ceo", "design", "senior", "verify", "cheap")
+STAGE_KEYS = ("video", "qa", "ui_shots", "garden")
+TEAM_KEYS = ("pm", "ceo", "design", "senior")
+
+
+def settings_paths():
+    env = os.environ.get("WORK_PROFILE")
+    cands = [env if env and os.path.isabs(env) else (os.path.join(REPO, env) if env else None),
+             os.path.join(REPO, ".work-profile", "work.json"), os.path.join(REPO, ".claude", "work.json")]
+    prof = next((p for p in cands if p and os.path.isfile(p)), None)
+    return prof, os.path.join(REPO, ".agent", "overrides.json")
+
+
+def read_settings():
+    prof_path, over_path = settings_paths()
+    prof = json.load(open(prof_path, encoding="utf-8")) if prof_path else {}
+    over = json.load(open(over_path, encoding="utf-8")) if os.path.isfile(over_path) else {}
+    team = prof.get("team") if isinstance(prof.get("team"), dict) else ({} if prof.get("team") is not False else {k: False for k in TEAM_KEYS})
+    view = lambda src, t: {
+        "models": {k: (src.get("models") or {}).get(k) for k in MODEL_KEYS},
+        "stages": {"video": src.get("video", True) is not False, "qa": src.get("qa", True) is not False,
+                   "ui_shots": src.get("ui_shots", True) is not False, "garden": src.get("garden", True) is not False},
+        "team": {k: (t or {}).get(k, True) is not False for k in TEAM_KEYS}}
+    return {"profile_path": os.path.relpath(prof_path, REPO) if prof_path else None,
+            "available_models": prof.get("available_models") or ["opus", "sonnet", "haiku", "fable"],
+            "model_fallback": prof.get("model_fallback"),
+            "repo": view(prof, team), "run": over}
+
+
+def apply_settings(scope, body):
+    prof_path, over_path = settings_paths()
+    if scope == "repo":
+        if not prof_path:
+            raise ValueError("no profile to update")
+        target_path = prof_path
+        target = json.load(open(prof_path, encoding="utf-8"))
+    elif scope == "run":
+        target_path = over_path
+        target = json.load(open(over_path, encoding="utf-8")) if os.path.isfile(over_path) else {}
+    else:
+        raise ValueError("scope must be repo or run")
+    allowed = set(read_settings()["available_models"])
+    for k, v in (body.get("models") or {}).items():
+        if k not in MODEL_KEYS:
+            raise ValueError(f"unknown model key {k}")
+        if v in (None, ""):
+            (target.get("models") or {}).pop(k, None)
+        elif v in allowed:
+            target.setdefault("models", {})[k] = v
+        else:
+            raise ValueError(f"{v} is not one of the available models")
+    for k, v in (body.get("stages") or {}).items():
+        if k not in STAGE_KEYS or not isinstance(v, bool):
+            raise ValueError(f"bad stage setting {k}")
+        if k == "garden" and v and isinstance(target.get("garden"), dict):
+            continue
+        target[k] = v if k != "garden" or not v else {"log": "docs/garden.md", "repeat": 2}
+    for k, v in (body.get("team") or {}).items():
+        if k not in TEAM_KEYS or not isinstance(v, bool):
+            raise ValueError(f"bad team setting {k}")
+        if not isinstance(target.get("team"), dict):
+            target["team"] = {} if target.get("team") is not False else {t: False for t in TEAM_KEYS}
+        target["team"][k] = v
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    tmp = target_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(target, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, target_path)
+    return read_settings()
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def _json(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path.split("?")[0] == "/api/settings":
+            try:
+                return self._json(200, read_settings())
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+        return super().do_GET()
+
+    def do_POST(self):
+        if self.path.split("?")[0] != "/api/settings":
+            return self._json(404, {"error": "not found"})
+        if self.headers.get("X-Work-Board") != "1" or "application/json" not in (self.headers.get("Content-Type") or ""):
+            return self._json(403, {"error": "missing X-Work-Board header"})
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+            return self._json(200, apply_settings(body.get("scope"), body))
+        except Exception as e:
+            return self._json(400, {"error": str(e)})
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
@@ -1008,12 +1123,14 @@ def main():
     args = ap.parse_args()
 
     repo = git_root(args.repo)
+    global REPO
+    REPO = repo
     SERVE = os.path.abspath(args.out) if args.out else os.path.join(tempfile.gettempdir(), "work-board" + slug(repo)[:80])
     OUT = os.path.join(SERVE, "data")
     os.makedirs(OUT, exist_ok=True)
     shutil.copyfile(os.path.join(HERE, "dashboard.html"), os.path.join(SERVE, "dashboard.html"))
     project_dirs = [os.path.expanduser(p) for p in args.project] if args.project else project_dirs_for(repo, os.getcwd())
-    pipelines = args.pipeline or [os.path.join(repo, ".agent", "state.json")]
+    pipelines = args.pipeline or [os.path.join(repo, ".agent", "state.json"), os.path.join(repo, ".work-runs", "*.json")]
     if not project_dirs:
         print("note: no Claude Code project folder found for this repo; showing the run manifest only "
               "(pass --project <config>/projects/<slug> to add workflow runs)", flush=True)

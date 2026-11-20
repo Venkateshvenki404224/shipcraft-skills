@@ -35,7 +35,7 @@ const GATE = (P.gate || []).map((c, i) => `${i + 1}. ${c}`).join('\n')
 const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
-const AUTO = P.autonomy === 'agents'
+const AUTO = (A.autonomy || (P.autonomy && typeof P.autonomy === 'object' ? (P.autonomy.single || 'owner') : P.autonomy)) === 'agents'
 const M = P.models || {}
 const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))
@@ -51,6 +51,9 @@ const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const FEATURE_MAP = P.feature_map || ''
+const QA_ON = P.qa !== false
+const SHOTS_ON = P.ui_shots !== false
+const UI_SHOTS = !!A.ui && SHOTS_ON
 const CASES = (A.testPlan && Array.isArray(A.testPlan.cases)) ? A.testPlan.cases : null
 const UI_TICKETS = T.filter((t) => t.kind !== 'test' && (t.role === 'frontend' || t.role === 'ui'))
 const E2E_COVERED = new Set((CASES || []).filter((c) => c.kind === 'e2e').flatMap((c) => c.covers || []))
@@ -218,7 +221,7 @@ if (A.mode === 'fixup') {
   result.fixes.push(await fix('owner fixup', 'Fix', { owner_themes: A.fixup && A.fixup.themes, findings: 'see .agent/evidence.md, .agent/qa/*.json, .agent/ui/review.json' }))
   phase('Gate + E2E')
   result.gates.push(await gate('fixup', 'Gate + E2E'))
-  if (A.ui) { phase('UI after'); result.ui = await uiAfter(':fixup') }
+  if (UI_SHOTS) { phase('UI after'); result.ui = await uiAfter(':fixup') }
 } else {
   // ------------------------------------------------ Tests first
   phase('Tests first')
@@ -243,7 +246,7 @@ For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket i
   result.red = red
 
   // ------------------------------------------------ UI before (base code still in place)
-  if (A.ui) {
+  if (UI_SHOTS) {
     phase('UI before')
     result.uiBefore = await run(`Run the UI before capture on the current code, before anything is implemented:
 ${snapCmd('before')}
@@ -288,12 +291,14 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
   // ------------------------------------------------ Agent QA, one explorer per role (on video when there is an app)
   phase('Agent QA')
   const qaRoles = ROLES.length ? ROLES : ['user']
-  const qa = (await parallel(qaRoles.map((role) => () => run(qaPrompt(role),
-    { label: `QA: ${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean)
+  const qa = QA_ON ? (await parallel(qaRoles.map((role) => () => run(qaPrompt(role),
+    { label: `QA: ${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean) : []
+  if (!QA_ON) log('agent QA is off in the profile: skipped')
+  result.skipped = [!QA_ON && 'agent QA', A.ui && !SHOTS_ON && 'UI before/after screenshots', !A.video && 'QA videos'].filter(Boolean)
   result.qa = qa
 
   // ------------------------------------------------ UI after + review
-  if (A.ui) { phase('UI after'); result.ui = await uiAfter('') }
+  if (UI_SHOTS) { phase('UI after'); result.ui = await uiAfter('') }
 
   // ------------------------------------------------ one QA fix round
   const qaMajors = qa.flatMap((r) => r.findings.map((f) => ({ ...f, role: r.role }))).filter((f) => !f.existing_bug && (f.severity === 'blocker' || f.severity === 'major'))
@@ -303,7 +308,7 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
     result.rounds.qa++
     result.fixes.push(await fix('QA findings', 'Fix', { qa: qaMajors, ui: uiFlags }))
     result.gates.push(await gate('after QA', 'Fix'))
-    if (A.ui) result.uiRecheck = await uiAfter(':recheck')
+    if (UI_SHOTS) result.uiRecheck = await uiAfter(':recheck')
   } else if (qaMajors.length || uiFlags.length) log('QA findings left: QA budget used up; they go to the owner')
 }
 
@@ -336,7 +341,7 @@ ${JSON.stringify(result)}
 Sections: what was built (plain words); test results as a role x browser table with NOT RUN where a browser did not run, plus flakes by name;
 gate table; verification verdict and what was fixed; agent QA counts and open findings grouped by theme (existing bugs labelled);
 UI before/after: every non-unchanged shot with its verdict (if .agent/ui/shots.json exists); videos: every file under .agent/video/ with role
-and kind; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
+and kind; stages skipped by the settings (result.skipped), each named as skipped; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
 Short sentences, no hype. Return the first 3 lines of the file.`,
   { label: 'Evidence: report', phase: 'Evidence', model: W })
 

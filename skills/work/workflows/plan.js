@@ -24,7 +24,7 @@ const ISSUE = A.issue || '.agent/issue.md'
 const RULES = (P.rules || ['CLAUDE.md']).join(', ')
 const ROLES = (P.roles || []).join(', ') || '(no user roles: the project has no app UI)'
 const HAS_APP = !!(P.app && P.app.url)
-const AUTO = P.autonomy === 'agents'
+const AUTO = (A.autonomy || (P.autonomy && typeof P.autonomy === 'object' ? (P.autonomy.single || 'owner') : P.autonomy)) === 'agents'
 const M = P.models || {}
 const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))

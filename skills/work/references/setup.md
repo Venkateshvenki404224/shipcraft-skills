@@ -72,7 +72,8 @@ When the profile is missing (or the owner says `/work setup`):
 | `model_fallback` | workflows | the model any role without one uses; one of `available_models` |
 | `models` | workflows | `plan` (architect), `approve` (approver), `research` (scope, researchers), `work` (tester, developers, gate, fixer, QA, evidence). Optional: `pm`, `ceo`, `design` (fall back to `plan`), `senior`, `verify` (fall back to `approve`), and `cheap` for the mechanical stages that only run commands and report (the scope pass, gate runs, red runs, UI snap captures; falls back to `work`; a small model such as `haiku` fits). Values come from `available_models` |
 | `team` | plan, build | `false` = lean pipeline; or `{pm, ceo, design, senior}` as `false` to turn one off; `senior` may be a list of reviewer names; `stack`, `business`, `design_system` (`references/team.md`) |
-| `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs") |
+| `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs"). May be per mode: `{"single": "owner", "chain": "agents", "lanes": "owner"}` |
+| `video`, `qa`, `ui_shots`, `garden` | build | `false` skips that stage (QA videos, agent QA, UI before/after screenshots, the Gardener); the evidence names each skipped stage. The board's Settings panel sets these, and the models, for every run (here) or for one run (`.agent/overrides.json`) |
 | `ship.mode` | ship | `pr` (default) or `squash` |
 | `ship.auto_push` | ship | with `autonomy: agents` only: push the run branch after each commit (never the base branch, never a PR) |
 

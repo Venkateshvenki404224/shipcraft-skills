@@ -66,7 +66,9 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 2. Write `.agent/workflow/plan.args.json`:
 
    ```
-   {"run": "<branch>", "issue": ".agent/issue.md", "title": "...", "today": "YYYY-MM-DD", "skill": "<absolute $S>", "profile": <the parsed profile>, "profilePath": "<PROFILE_PATH>"}
+   {"run": "<branch>", "issue": ".agent/issue.md", "title": "...", "today": "YYYY-MM-DD", "skill": "<absolute $S>", "profile": <the parsed profile>, "profilePath": "<PROFILE_PATH>", "autonomy": "<owner|agents for this mode>"}
+
+   **Per-run settings.** Before writing any workflow's args (plan, build, fixup, resume), read `.agent/overrides.json` if it exists (the board's Settings panel writes it with "this run only") and lay it over the profile: its `models` keys replace the profile's, and `video`, `qa`, `ui_shots`, `garden` and `team` values replace theirs. Say in one line what the overrides changed. The panel's "every run" scope edits the profile itself.
    ```
 
    Pass the date from your context; scripts cannot read the clock.
@@ -186,10 +188,10 @@ A single agent that dies (a network drop, an API error) is retried by the workfl
 
 ## Unattended runs (`"autonomy": "agents"`)
 
-Only when the profile says `"autonomy": "agents"`. Setup asks this on first use and the default is `"owner"` (the owner decides at H1 and H2); `agents` is written only when the owner picks it, and that choice is their standing OK. Then the team stands in for the owner:
+`autonomy` is either one value for every mode or one per mode: `{"single": "owner", "chain": "agents", "lanes": "owner"}`. The defaults are `owner` for `/work <n>` and for each lane, and `agents` for `/work chain` (invoking a chain is the owner asking to be away). A plain string applies to `single` and `lanes`; chains still default to `agents` unless `chain` says `owner`. When the mode's value is `agents`:
 - **H1** passes when the verifier and the approval agent both APPROVE, after the PM's decisions. If they still say REVISE after 2 rounds, stop and report.
 - **H2** passes when the gate is green and the CEO signs off SHIP. A CEO HOLD gets one fix round on its `must_fix` items (build.js `mode: "fixup"`), then a second sign-off; still HOLD = stop and report.
-- **Ship** = commit on the run branch, in small commits. Push the branch only when `ship.auto_push` is true. Never merge into the base branch, never open a pull request, never post anywhere: those wait for the owner.
+- **Ship** = commit on the run branch, in small commits. Push the branch only when `ship.auto_push` is true. Never merge into the base branch, never open a pull request, never post anywhere: those wait for the owner (a chain opens draft PRs, § Chains).
 - Log every decision the owner would have made, with the reason and any dissent, in `.agent/decisions.md`, and mark the gates `DONE` with "agents" in the summary.
 - A model that does not answer (an agent hangs or returns nothing three times): change that role's model in the args, say so in `decisions.md`, and go on.
 

@@ -102,6 +102,18 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
 .status-line{margin-top:.35rem;font-size:1rem;font-weight:600}
 .problem{margin:.5rem 0;padding:.6rem .9rem;border-radius:10px;background:var(--amber-soft);color:var(--text);outline:1px solid var(--amber)}
 .problem.soft{outline-color:var(--border);background:var(--surface-2)}
+#settings{border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);padding:0;max-width:760px;width:calc(100% - 32px)}
+#settings::backdrop{background:rgba(0,0,0,.45)}
+.set-form{padding:18px 20px}.set-form h3{margin:0 0 4px}.set-form .h{color:var(--muted);font-size:13px}
+.set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}@media(max-width:640px){.set-grid{grid-template-columns:1fr}}
+.set-form fieldset{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0}.set-form legend{font-weight:600;font-size:13px;color:var(--muted)}.set-form legend.sub{margin-top:10px}
+.set-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;font-size:14px}
+.set-row select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+.scope select{margin-left:6px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+.set-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:10px}.set-actions .h{margin-right:auto}
+.btn.primary{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.hist{width:100%;border-collapse:collapse;font-size:14px}.hist th,.hist td{text-align:left;padding:8px 10px;border-top:1px solid var(--border)}.hist th{color:var(--muted);font-weight:600;border-top:0}
+.hist tr.row{cursor:pointer}.hist tr.row:hover{background:var(--surface-2)}
 .app-link{display:flex;gap:.5rem;align-items:center;margin:.5rem 0 1rem;padding:.6rem .9rem;border-radius:10px;background:var(--surface-2);font-size:.95rem}
 .app-link a{color:inherit;font-weight:600}
 .app-link .h{color:var(--muted)}
@@ -236,6 +248,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     <div class="controls">
       <span class="live" id="status"><span class="dot"></span>connecting…</span>
       <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
+      <button class="btn" id="openSettings" data-testid="open-settings">Settings</button>
       <button class="btn" id="toggleTheme">Theme</button>
       <div class="pop" id="run-pop" hidden>
         <input id="run-q" placeholder="Filter runs…" autocomplete="off" aria-label="Filter runs">
@@ -271,6 +284,9 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     </div>
   </div>
 
+  <div class="section-title">All runs in this repo</div>
+  <div class="card" id="history" data-testid="history"></div>
+
   <footer>
     <span>Keys: R runs · Esc close · click a step or a row for its prompt, activity and result</span>
     <span>Cost is API-equivalent at list prices (estimated).</span>
@@ -292,6 +308,22 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     </div>
   </aside>
 </div>
+
+<dialog id="settings" data-testid="settings">
+  <form method="dialog" class="set-form" id="set-form">
+    <h3>Run settings</h3>
+    <p class="h" id="set-src"></p>
+    <label class="scope">Apply to
+      <select id="set-scope"><option value="run">this run only (.agent/overrides.json)</option><option value="repo">every run (the profile)</option></select>
+    </label>
+    <div class="set-grid">
+      <fieldset><legend>Models</legend><div id="set-models"></div></fieldset>
+      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div></fieldset>
+    </div>
+    <p class="h">Changes apply when the next workflow starts (the plan, or the build after H1). A stage turned off is reported as skipped in the evidence.</p>
+    <div class="set-actions"><span id="set-msg" class="h"></span><button value="cancel" class="btn">Close</button><button id="set-save" class="btn primary" value="default">Save</button></div>
+  </form>
+</dialog>
 
 <script>
 const POLL_MS = 2000
@@ -499,6 +531,7 @@ function render() {
   renderTable(run, gs)
   renderEvidence(run)
   renderDocs(run)
+  renderHistory()
 }
 
 function statusLine(run, gs) {
@@ -516,6 +549,54 @@ function statusLine(run, gs) {
     return `${a.phase}: ${live || a.title}. ${done} of ${gs.length} steps done${nextGate ? `; ${nextGate.title.split(':')[0]} needs you next` : ''}.`
   }
   return `Between steps: ${done} of ${gs.length} done; next is ${left[0].title}.`
+}
+
+function renderHistory() {
+  const runs = (state?.runs || []).filter((r) => isPipeline(r) || !(state.runs || []).some((p) => isPipeline(p) && p.groups.some((g) => g.agents.some((a) => a.run === r.id))))
+  const rows = runs.slice().sort((a, b) => (b.started || 0) - (a.started || 0)).map((r) => {
+    const by = Object.entries(r.cost_by_model || {}).sort((a, b) => b[1] - a[1]).map(([m, c]) => `${cap(m)} ${money(c)}`).join(' · ') || '–'
+    return `<tr class="row" data-run="${esc(r.id)}"><td>${esc(r.name)}<div class="h">${isPipeline(r) ? '/work run' : 'workflow'} · ${esc(r.state)}</div></td><td>${r.started ? esc(new Date(r.started * 1000).toLocaleString()) : '–'}</td><td class="num">${r.elapsed ? dur(r.elapsed) : '–'}</td><td class="num">${money(r.cost)}</td><td>${esc(by)}</td></tr>`
+  }).join('')
+  $('history').innerHTML = rows ? `<table class="hist"><tr><th>Run</th><th>Started</th><th>Time</th><th>Cost (est.)</th><th>Cost by model</th></tr>${rows}</table>` : '<div class="empty">No runs yet.</div>'
+}
+
+let settings = null
+async function openSettings() {
+  if (SNAP) { alert('Settings can be changed on the live board only (this is a snapshot).'); return }
+  const res = await fetch('/api/settings', { cache: 'no-store' })
+  settings = await res.json()
+  if (settings.error) { alert(settings.error); return }
+  fillSettings()
+  $('settings').showModal()
+}
+function fillSettings() {
+  const scope = $('set-scope').value
+  const src = scope === 'run' ? mergeRun(settings.repo, settings.run) : settings.repo
+  $('set-src').textContent = `Profile: ${settings.profile_path || 'none'}${settings.model_fallback ? ` · fallback model ${settings.model_fallback}` : ''}`
+  const opts = (cur) => ['<option value="">(fallback)</option>', ...settings.available_models.map((m) => `<option ${m === cur ? 'selected' : ''}>${esc(m)}</option>`)].join('')
+  const LABEL = { plan: 'Architect (plan)', approve: 'Approver', research: 'Research', work: 'Developers, tester, QA', pm: 'PM', ceo: 'CEO', design: 'UI/UX designer', senior: 'Senior devs', verify: 'Verifiers', cheap: 'Gate runs, screenshots' }
+  $('set-models').innerHTML = Object.keys(LABEL).map((k) => `<label class="set-row">${LABEL[k]}<select data-model="${k}">${opts(src.models[k])}</select></label>`).join('')
+  const SL = { video: 'QA videos', qa: 'Agent QA', ui_shots: 'UI before/after screenshots', garden: 'Gardener' }
+  $('set-stages').innerHTML = Object.keys(SL).map((k) => `<label class="set-row">${SL[k]}<input type="checkbox" data-stage="${k}" ${src.stages[k] ? 'checked' : ''}></label>`).join('')
+  const TL = { pm: 'PM', ceo: 'CEO', design: 'UI/UX designer', senior: 'Senior devs' }
+  $('set-team').innerHTML = Object.keys(TL).map((k) => `<label class="set-row">${TL[k]}<input type="checkbox" data-team="${k}" ${src.team[k] ? 'checked' : ''}></label>`).join('')
+  $('set-msg').textContent = ''
+}
+function mergeRun(repo, run) {
+  return { models: { ...repo.models, ...(run.models || {}) },
+    stages: Object.fromEntries(Object.entries(repo.stages).map(([k, v]) => [k, run[k] === undefined ? v : run[k] !== false])),
+    team: { ...repo.team, ...Object.fromEntries(Object.entries((run.team || {})).map(([k, v]) => [k, v !== false])) } }
+}
+async function saveSettings(e) {
+  e.preventDefault()
+  const body = { scope: $('set-scope').value, models: {}, stages: {}, team: {} }
+  document.querySelectorAll('[data-model]').forEach((el) => { body.models[el.dataset.model] = el.value })
+  document.querySelectorAll('[data-stage]').forEach((el) => { body.stages[el.dataset.stage] = el.checked })
+  document.querySelectorAll('[data-team]').forEach((el) => { body.team[el.dataset.team] = el.checked })
+  const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Work-Board': '1' }, body: JSON.stringify(body) })
+  const out = await res.json()
+  if (out.error) { $('set-msg').textContent = out.error; return }
+  settings = out; fillSettings(); $('set-msg').textContent = body.scope === 'run' ? 'Saved for this run.' : `Saved to ${out.profile_path}.`
 }
 
 function renderRoles(run, gs) {
@@ -738,6 +819,10 @@ async function poll() {
 
 // ---- events ----
 $('run-btn').addEventListener('click', (e) => { e.stopPropagation(); $('run-pop').hidden ? openPop() : closePop() })
+$('openSettings').addEventListener('click', openSettings)
+$('set-scope').addEventListener('change', fillSettings)
+$('set-form').addEventListener('submit', (e) => { if (e.submitter && e.submitter.value === 'cancel') return; saveSettings(e) })
+$('history').addEventListener('click', (e) => { const r = e.target.closest('[data-run]'); if (r) { selectRun(r.dataset.run); window.scrollTo({ top: 0, behavior: 'smooth' }) } })
 $('run-q').addEventListener('input', () => { popIndex = 0; renderRunPicker() })
 $('run-q').addEventListener('keydown', (e) => {
   const rows = [...$('run-list').querySelectorAll('.run-row')]
