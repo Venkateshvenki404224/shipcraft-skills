@@ -59,7 +59,7 @@ Any feature that changes what a user sees gets a screenshot of each affected pag
 |---|---|---|
 | Before | After tests first, before Implement: only test files have changed, so the pages show the base code. | `before/<id>.png`, `run.json` (commit, dirty count) |
 | After | After the last fix round, and again after any later round that touched UI files. | `after/`, `diff/` (changed pixels in red), `marked/` (the after image with a red box around each changed area), `shots.json` |
-| UI review | Right after the After step (Sonnet; Opus at high risk) | `review.json` |
+| UI review | Right after the After step (`models.work`; `models.approve` at high risk) | `review.json` |
 
 Shot id: `<page>--<role>--<viewport>--<theme>`. Status in `shots.json`: `unchanged` (fewer than `min_pixels` differ), `changed`, `new` (no before), `removed` (no after). The final URL path is recorded for both captures, so a redirect shows up.
 
