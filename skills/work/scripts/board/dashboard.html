@@ -34,6 +34,12 @@ header{display:flex;gap:16px;align-items:center;justify-content:space-between;fl
 h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
 .sub{color:var(--muted);font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative}
+.controls .tools{display:inline-flex;gap:6px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
+.btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
+.btn svg{flex:none}
+.pop.hist-pop{width:min(860px,calc(100vw - 32px));max-height:70vh;overflow:auto}
+.hist td.nw,.hist th.nw{white-space:nowrap}
+.hist .nm{font-weight:600}
 .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:5px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface)}
 .live .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
 .live.error{color:var(--red)}.live.error .dot{background:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
@@ -247,9 +253,16 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     </div>
     <div class="controls">
       <span class="live" id="status"><span class="dot"></span>connecting…</span>
-      <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
-      <button class="btn" id="openSettings" data-testid="open-settings">Settings</button>
-      <button class="btn" id="toggleTheme">Theme</button>
+      <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
+      <span class="tools">
+        <button class="btn icon" id="hist-btn" data-testid="open-history" aria-haspopup="dialog" aria-expanded="false" aria-label="All runs in this repo (H)" title="All runs in this repo (H)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+        <button class="btn icon" id="openSettings" data-testid="open-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button class="btn icon" id="toggleTheme" aria-label="Switch light or dark theme" title="Theme"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      </span>
+      <div class="pop hist-pop" id="hist-pop" hidden role="dialog" aria-label="All runs in this repo">
+        <div class="pop-sec">All runs in this repo</div>
+        <div id="history" data-testid="history"></div>
+      </div>
       <div class="pop" id="run-pop" hidden>
         <input id="run-q" placeholder="Filter runs…" autocomplete="off" aria-label="Filter runs">
         <div class="pop-list" id="run-list" role="listbox"></div>
@@ -284,11 +297,8 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     </div>
   </div>
 
-  <div class="section-title">All runs in this repo</div>
-  <div class="card" id="history" data-testid="history"></div>
-
   <footer>
-    <span>Keys: R runs · Esc close · click a step or a row for its prompt, activity and result</span>
+    <span>Keys: R runs · H all runs · Esc close · click a step or a row for its prompt, activity and result</span>
     <span>Cost is API-equivalent at list prices (estimated).</span>
   </footer>
 </div>
@@ -555,9 +565,10 @@ function renderHistory() {
   const runs = (state?.runs || []).filter((r) => isPipeline(r) || !(state.runs || []).some((p) => isPipeline(p) && p.groups.some((g) => g.agents.some((a) => a.run === r.id))))
   const rows = runs.slice().sort((a, b) => (b.started || 0) - (a.started || 0)).map((r) => {
     const by = Object.entries(r.cost_by_model || {}).sort((a, b) => b[1] - a[1]).map(([m, c]) => `${cap(m)} ${money(c)}`).join(' · ') || '–'
-    return `<tr class="row" data-run="${esc(r.id)}"><td>${esc(r.name)}<div class="h">${isPipeline(r) ? '/work run' : 'workflow'} · ${esc(r.state)}</div></td><td>${r.started ? esc(new Date(r.started * 1000).toLocaleString()) : '–'}</td><td class="num">${r.elapsed ? dur(r.elapsed) : '–'}</td><td class="num">${money(r.cost)}</td><td>${esc(by)}</td></tr>`
+    const when = r.started ? new Date(r.started * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–'
+    return `<tr class="row" data-run="${esc(r.id)}"><td><div class="nm">${esc(r.name)}</div><div class="h">${isPipeline(r) ? '/work run' : 'workflow'} · ${esc(r.state)}</div></td><td class="nw">${esc(when)}</td><td class="num nw">${r.elapsed ? dur(r.elapsed) : '–'}</td><td class="num nw">${money(r.cost)}</td><td>${esc(by)}</td></tr>`
   }).join('')
-  $('history').innerHTML = rows ? `<table class="hist"><tr><th>Run</th><th>Started</th><th>Time</th><th>Cost (est.)</th><th>Cost by model</th></tr>${rows}</table>` : '<div class="empty">No runs yet.</div>'
+  $('history').innerHTML = rows ? `<table class="hist"><tr><th>Run</th><th class="nw">Started</th><th class="nw">Time</th><th class="nw">Cost</th><th>By model</th></tr>${rows}</table>` : '<div class="empty">No runs yet.</div>'
 }
 
 let settings = null
@@ -820,9 +831,16 @@ async function poll() {
 // ---- events ----
 $('run-btn').addEventListener('click', (e) => { e.stopPropagation(); $('run-pop').hidden ? openPop() : closePop() })
 $('openSettings').addEventListener('click', openSettings)
+function toggleHist(force) {
+  const show = force === undefined ? $('hist-pop').hidden : force
+  $('hist-pop').hidden = !show
+  $('hist-btn').setAttribute('aria-expanded', String(show))
+  if (show) { closePop(); renderHistory() }
+}
+$('hist-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleHist() })
 $('set-scope').addEventListener('change', fillSettings)
 $('set-form').addEventListener('submit', (e) => { if (e.submitter && e.submitter.value === 'cancel') return; saveSettings(e) })
-$('history').addEventListener('click', (e) => { const r = e.target.closest('[data-run]'); if (r) { selectRun(r.dataset.run); window.scrollTo({ top: 0, behavior: 'smooth' }) } })
+$('history').addEventListener('click', (e) => { const r = e.target.closest('[data-run]'); if (r) { toggleHist(false); selectRun(r.dataset.run) } })
 $('run-q').addEventListener('input', () => { popIndex = 0; renderRunPicker() })
 $('run-q').addEventListener('keydown', (e) => {
   const rows = [...$('run-list').querySelectorAll('.run-row')]
@@ -837,6 +855,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('click', (e) => {
   if (e.target.closest('a')) return
   if (!e.target.closest('#run-pop') && !$('run-pop').hidden) closePop()
+  if (!e.target.closest('#hist-pop') && !e.target.closest('#hist-btn') && !$('hist-pop').hidden) toggleHist(false)
   const t = (sel) => e.target.closest(sel)
   let el
   if ((el = t('[data-run]'))) return selectRun(el.dataset.run)
@@ -855,11 +874,12 @@ document.addEventListener('click', (e) => {
   if (t('[data-close]')) closeDrawer()
 })
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (!$('run-pop').hidden) return closePop(); return closeDrawer() }
+  if (e.key === 'Escape') { if (!$('hist-pop').hidden) { toggleHist(false); return $('hist-btn').focus() } if (!$('run-pop').hidden) return closePop(); return closeDrawer() }
   const row = e.target.closest?.('[data-group]')
   if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); return openDrawer({ kind: 'group', id: row.dataset.group }) }
   if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey || document.body.classList.contains('open')) return
-  if (e.key.toLowerCase() === 'r') { e.preventDefault(); openPop() }
+  if (e.key.toLowerCase() === 'r') { e.preventDefault(); toggleHist(false); openPop() }
+  if (e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHist() }
 })
 
 // ---- markdown (no external library: works offline and in snapshots) ----
