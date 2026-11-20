@@ -40,6 +40,8 @@ When a budget runs out, the run stops and asks. It never loops silently.
 - **A test that fails once and then passes is a flake.** Repeat it 20 times. If all 20 pass, name it in the evidence. If any fails, it is a failure.
 - **Parallel end-to-end tests need one account set per worker.** With one set, run with one worker.
 - **One checkout, not a worktree per ticket,** when the local app serves the checkout (bind mounts, a dev server). A ticket in another worktree is not what the app serves.
+- **Stateful features get a statechart and property tests.** The plan draws the states and transitions (Mermaid) and names the invariants; each invariant has a property-based test, each transition a case, including the forbidden ones.
+- **No tautological tests.** A test that restates the implementation, only asserts a mock was called, or cannot fail when the behaviour breaks is removed, not counted.
 - **A fix never weakens an assertion, widens a timeout or deletes a test** to go green.
 
 ## Agent QA rules
