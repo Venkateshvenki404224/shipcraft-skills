@@ -17,7 +17,7 @@ export const meta = {
 }
 
 // Copied per run to .agent/workflow/build.js by the /work skill. The run's shape comes from args:
-// {run, today, skill, profile (the repo's .claude/work.json), tickets:[{id,title,kind,files,deps,acceptance,model}],
+// {run, today, skill, profile (the repo's work profile), tickets:[{id,title,kind,files,deps,acceptance,model}],
 //  roles:["user","admin",...], risk:"low|medium|high", ui:bool, e2e:"command for this feature's tests",
 //  uiSnap:"command with {phase} for before/after" (ui runs), video:bool, budgets:{build:2, qa:1},
 //  mode:"build"|"fixup", fixup:{themes:"..."}}   ("fixup" = the owner's "one more fix round, then ship")
@@ -33,10 +33,16 @@ const BUDGET = { build: (A.budgets && A.budgets.build) ?? 2, qa: (A.budgets && A
 const GATE = (P.gate || []).map((c, i) => `${i + 1}. ${c}`).join('\n')
 const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
-const W = (P.models && P.models.work) || 'sonnet'
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
 const AUTO = P.autonomy === 'agents'
+// Models come only from the profile's "models" (no defaults here). The orchestrator asks the owner for them
+// during setup, so a missing key is an error, not a silent fallback.
 const M = P.models || {}
+const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !M[k])
+if (MISSING.length) throw new Error(`profile.models is missing: ${MISSING.join(', ')}. Ask the owner for them (references/setup.md, "Models") and pass the profile again.`)
+const W = M.work
+const VERIFY_M = M.verify || M.approve
+const PM_M = M.pm || M.plan, CEO_M = M.ceo || M.plan, DESIGN_M = M.design || M.plan
 const TEAM = P.team === false ? { pm: false, ceo: false, design: false } : (P.team || {})
 const PM_ON = TEAM.pm !== false, CEO_ON = TEAM.ceo !== false, DESIGN_ON = TEAM.design !== false
 const STACK = TEAM.stack || P.stack || ''
@@ -168,7 +174,7 @@ unreadable text, an empty state where data belongs, wrong data for the role${des
 against the project's access rules (${REVIEW_RULES}). Write .agent/ui/review.json:
 {"verdict":"PASS|CHANGES","summary":"one line","shots":{"<id>":{"verdict":"expected|unexpected|broken","note":"..."}}}
 verdict is PASS only if nothing is unexpected or broken. Return the same verdict, summary, counts per verdict and the flagged shots.`,
-    { label: `${designer ? 'UI/UX designer' : 'UI reviewer'}: shots${tag}`, phase: 'UI after', schema: UIREV, model: designer ? (M.design || M.plan || 'opus') : (RISK === 'high' ? 'opus' : W) })
+    { label: `${designer ? 'UI/UX designer' : 'UI reviewer'}: shots${tag}`, phase: 'UI after', schema: UIREV, model: designer ? DESIGN_M : (RISK === 'high' ? M.approve : W) })
   return { capture: cap, review: rev }
 }
 
@@ -245,13 +251,13 @@ It reads .agent/ui/pages.json. Report the shot count and any errors. Do not chan
   // ------------------------------------------------ Verify by risk tier
   phase('Verify')
   const LENSES = RISK === 'high' ? ['correctness and regressions', 'security, auth and role checks', 'UI rules, accessibility, phone widths'] : ['correctness and regressions']
-  const verifyModel = RISK === 'low' ? W : 'opus'
+  const verifyModel = RISK === 'low' ? W : VERIFY_M
   const reviews = (await parallel(LENSES.map((lens) => () => run(
     `Review the uncommitted diff of ${NAME} run ${A.run} (git diff; new files included) through this lens: ${lens}.
 Read .agent/plan.md for intent and ${REVIEW_RULES}. Each finding cites a rule heading from those files, or names a concrete failing
 behaviour (input -> wrong output); anything else is an opinion: leave it out. Confirm every finding against the code before you report it:
 a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, with file:line. Change nothing.`,
-    { label: `Verifier: ${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: M.verify && RISK !== 'low' ? M.verify : verifyModel })))).filter(Boolean)
+    { label: `Verifier: ${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: verifyModel })))).filter(Boolean)
   result.verify = reviews
   const serious = reviews.flatMap((r) => r.findings).filter((f) => f.severity === 'blocker' || f.severity === 'major' || f.severity === 'minor')
   if (serious.length && result.rounds.build < BUDGET.build) {
@@ -302,7 +308,7 @@ if (PM_ON) {
 Read .agent/prd.md (acceptance criteria and entry point), .agent/pm.md (your decisions), .agent/evidence.md, .agent/qa/*.json${A.ui ? ', .agent/ui/review.json' : ''}.
 For each acceptance criterion: met, partly or not met, with the evidence (a test id, a QA step, a screenshot or a video). Check the entry point: can a user find
 the feature from where they already are? Write .agent/pm-report.md in plain words for the owner, with a table of the criteria. Return the counts.`,
-    { label: 'PM: acceptance report', phase: 'Sign-off', schema: PMREP, model: M.pm || M.plan || 'opus' })
+    { label: 'PM: acceptance report', phase: 'Sign-off', schema: PMREP, model: PM_M })
 }
 if (CEO_ON) {
   result.signoff = await run(
@@ -310,6 +316,6 @@ if (CEO_ON) {
 Read .agent/ceo.md (your scope, must-haves and never-claim list)${PM_ON ? ', .agent/pm-report.md' : ''}, .agent/evidence.md and .agent/qa/*.json.
 SHIP when the must-haves are in, the gate is green, nothing blocker or major is open and nothing in the product promises what it does not do. Otherwise HOLD,
 with must_fix: the exact items to fix before it ships. Write .agent/ceo-signoff.md (verdict, reasons, must_fix). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
-    { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: M.ceo || M.plan || 'opus' })
+    { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: CEO_M })
 }
 return result

@@ -14,7 +14,7 @@ export const meta = {
 }
 
 // Copied per run to .agent/workflow/plan.js by the /work skill. Everything project-specific comes in through
-// args.profile (the repo's .claude/work.json); the date comes in through args, never the clock.
+// args.profile (the repo's work profile; its location is args.profilePath); the date comes in through args, never the clock.
 // The agent team (PM, CEO, UI/UX designer, senior developers) is on by default; the profile's "team" turns parts off.
 const A = args || {}
 const P = A.profile || {}
@@ -25,11 +25,15 @@ const RULES = (P.rules || ['CLAUDE.md']).join(', ')
 const ROLES = (P.roles || []).join(', ') || '(no user roles: the project has no app UI)'
 const HAS_APP = !!(P.app && P.app.url)
 const AUTO = P.autonomy === 'agents'
+// Models come only from the profile's "models" (no defaults here). The orchestrator asks the owner for them
+// during setup, so a missing key is an error, not a silent fallback.
 const M = P.models || {}
+const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !M[k])
+if (MISSING.length) throw new Error(`profile.models is missing: ${MISSING.join(', ')}. Ask the owner for them (references/setup.md, "Models") and pass the profile again.`)
 const MODELS = {
-  scope: M.research || 'sonnet', research: M.research || 'sonnet', plan: M.plan || 'opus', approve: M.approve || 'opus',
-  verify: M.verify || M.approve || 'opus', pm: M.pm || M.plan || 'opus', ceo: M.ceo || M.plan || 'opus',
-  design: M.design || M.plan || 'opus', senior: M.senior || M.approve || 'opus',
+  scope: M.research, research: M.research, plan: M.plan, approve: M.approve,
+  verify: M.verify || M.approve, pm: M.pm || M.plan, ceo: M.ceo || M.plan,
+  design: M.design || M.plan, senior: M.senior || M.approve,
 }
 const TEAM = P.team === false ? { pm: false, ceo: false, design: false, senior: false } : (P.team || {})
 const PM_ON = TEAM.pm !== false
@@ -149,13 +153,13 @@ phase('Plan')
 const productFiles = [PM_ON && '.agent/prd.md', CEO_ON && '.agent/ceo.md'].filter(Boolean)
 const planPrompt = (extra) => `You are the architect for ${NAME} run ${A.run} (${A.title || ''}), today ${A.today || ''}.
 Read ${ISSUE}, ${productFiles.length ? `${productFiles.join(', ')} (the product brief and the CEO's scope: honour the cuts and must-haves), ` : ''}${SKILL}/references/pipeline.md (sections "Plan check", "Test rules", "UI before / after"), the project rules (${RULES}),
-the project profile .claude/work.json, and these research reports:
+the project profile (${A.profilePath || '.claude/work.json'}), and these research reports:
 ${JSON.stringify(research)}
 
 Write these files (create .agent/ui/ only if ui):
 - .agent/research.md: the research above, merged and deduplicated, with evidence.
 - .agent/plan.md: goal; a table mapping EVERY sentence of the request${PM_ON ? ' and every acceptance criterion of prd.md' : ''} to a ticket or to "out of scope"; design; the test contract (for UI: the exact data-* or role/label hooks tests will use, and which component gets each; for APIs/CLIs: the exact calls and outputs); roles affected and how each is checked; risk tier with the reason; expected visible changes, one line per page (ui only); at most 4 open questions, each with a proposed default.
-- .agent/tickets.json: [{"id":"T1","title":"...","kind":"test|impl|docs","role":"test|backend|frontend|ui|data|docs","files":["..."],"deps":["T0"],"acceptance":["Given/When/Then"],"model":"sonnet"}]. "role" says which developer builds it: backend (server code, APIs, jobs, permissions), frontend (pages, components, client code), ui (styles, layout, copy, design-system work), data (migrations, fixtures, seed data), docs, test. Test tickets come first and depend on nothing but fixtures. Tickets that share a file must depend on each other.
+- .agent/tickets.json: [{"id":"T1","title":"...","kind":"test|impl|docs","role":"test|backend|frontend|ui|data|docs","files":["..."],"deps":["T0"],"acceptance":["Given/When/Then"],"model":"${M.work}"}]. "role" says which developer builds it: backend (server code, APIs, jobs, permissions), frontend (pages, components, client code), ui (styles, layout, copy, design-system work), data (migrations, fixtures, seed data), docs, test. Test tickets come first and depend on nothing but fixtures. Tickets that share a file must depend on each other.
 - .agent/test-plan.json: unit/script checks and end-to-end cases with ids, role, browser list (from the profile's e2e.browsers), and which ticket each covers; include cross-page state cases for anything that navigates and skip cases for role-gated steps.
 - .agent/ui/pages.json (only if ui): pages, roles, viewports, themes, hide/mask, in the format at the top of ${SKILL}/scripts/ui-snap/spec.ts.${P.ui_snap && P.ui_snap.theme_key ? ` Set "theme_key": "${P.ui_snap.theme_key}".` : ''}${P.ui_snap && P.ui_snap.hide && P.ui_snap.hide.length ? ` Default "hide": ${JSON.stringify(P.ui_snap.hide)}.` : ''}
 Return "specs": the test files or folder of this feature, as they go into the profile's e2e command.
