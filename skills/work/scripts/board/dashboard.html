@@ -99,6 +99,10 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
 .pill.issue{background:var(--red-soft);color:var(--red)}
 .pill.changes{background:var(--amber-soft);color:var(--amber)}
 .pill.wait{background:var(--pink-soft);color:var(--pink)}
+.app-link{display:flex;gap:.5rem;align-items:center;margin:.5rem 0 1rem;padding:.6rem .9rem;border-radius:10px;background:var(--surface-2);font-size:.95rem}
+.app-link a{color:inherit;font-weight:600}
+.app-link .h{color:var(--muted)}
+.app-link.down{outline:1px solid var(--amber,#d4a017)}
 .pill.queued,.pill.skipped{background:var(--surface-2);color:var(--muted)}
 .spin{width:9px;height:9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .9s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -455,7 +459,8 @@ function render() {
   $('title').textContent = run.name
   $('subtitle').innerHTML = [esc(run.state), isPipeline(run) ? '/work pipeline' : 'workflow run', `started ${esc(ago(run.started))}`, `elapsed ${dur(run.elapsed)}`, money(run.cost) + ' est.']
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
-  $('banner').innerHTML = run.error ? `<div class="banner">${esc(run.error)}</div>` : ''
+  $('banner').innerHTML = (run.error ? `<div class="banner">${esc(run.error)}</div>` : '')
+    + (run.app ? `<div class="app-link ${run.app.up ? 'up' : 'down'}" data-testid="app-link"><span class="sdot ${run.app.up ? 'finished' : 'failed'}"></span>The app: <a href="${esc(run.app.url)}" target="_blank" rel="noopener">${esc(run.app.url)}</a> <span class="h">${run.app.up ? 'up' : `not answering${run.app.start ? ` · start it with <code>${esc(run.app.start)}</code>` : ''}`}</span></div>` : '')
 
   // KPIs
   const phases = (run.phases && run.phases.length ? run.phases : [...new Set(gs.map((g) => g.phase))])
@@ -508,15 +513,20 @@ function renderRoles(run, gs) {
 }
 
 function renderTable(run, gs) {
-  const c = Object.fromEntries(CATS.map((k) => [k, gs.filter((g) => cat(g) === k).length]))
-  $('filters').innerHTML = `<button class="chip ${prefs.filter === 'all' ? 'on' : ''}" data-filter="all">All<span class="n">${gs.length}</span></button>`
+  const scoped = gs.filter((g) => (!prefs.role || roleOf(run, g) === prefs.role) && (!prefs.phase || g.phase === prefs.phase))
+  const c = Object.fromEntries(CATS.map((k) => [k, scoped.filter((g) => cat(g) === k).length]))
+  $('filters').innerHTML = `<button class="chip ${prefs.filter === 'all' ? 'on' : ''}" data-filter="all">All<span class="n">${scoped.length}</span></button>`
     + CATS.filter((k) => c[k]).map((k) => `<button class="chip ${prefs.filter === k ? 'on' : ''}" data-filter="${k}">${CAT_LABEL[k]}<span class="n">${c[k]}</span></button>`).join('')
   $('agentsTitle').textContent = [prefs.role || 'All steps', prefs.phase && `stage ${prefs.phase}`].filter(Boolean).join(' · ')
   const order = { wait: 0, running: 1, issue: 2, queued: 3, done: 4, skipped: 5 }
   const phases = run.phases || []
-  const list = gs.filter((g) => (prefs.filter === 'all' || cat(g) === prefs.filter) && (!prefs.role || roleOf(run, g) === prefs.role) && (!prefs.phase || g.phase === prefs.phase))
+  const list = scoped.filter((g) => prefs.filter === 'all' || cat(g) === prefs.filter)
     .sort((a, b) => order[cat(a)] - order[cat(b)] || (isPipeline(run) ? phases.indexOf(a.phase) - phases.indexOf(b.phase) : (b.started || 0) - (a.started || 0)))
-  if (!list.length) { $('agents').innerHTML = '<tr><td class="empty">Nothing here yet</td></tr>'; return }
+  if (!list.length) {
+    const filtered = prefs.filter !== 'all' || prefs.role || prefs.phase
+    $('agents').innerHTML = `<tr><td class="empty">${filtered ? 'Nothing matches these filters. <button class="chip" data-clear="1">Show all steps</button>' : 'Nothing here yet'}</td></tr>`
+    return
+  }
   $('agents').innerHTML = '<tr><th>Status</th><th>Step</th><th class="hide-sm">Role</th><th class="hide-sm">Model</th><th class="hide-sm">Cost</th><th>Time</th></tr>'
     + list.map((g) => {
       const a = g.agents.length
@@ -646,7 +656,7 @@ function renderVideos(run) {
 function groupFiles(run, g) {
   const out = []
   for (const a of g.agents) for (const f of ['result', 'activity', 'prompt'])
-    out.push({ group: `${a.step || a.label} · ${cap(a.model)} · ${STATUS_WORD[a.status] || a.status}`, name: f, path: `data/${run.id}/agents/${a.id}/${f}.md`, status: a.status })
+    out.push({ group: `${a.label || a.step} · ${cap(a.model)} · ${STATUS_WORD[a.status] || a.status}`, name: f, path: `data/${a.run || run.id}/agents/${a.id}/${f}.md`, status: a.status })
   return out
 }
 async function refreshDrawer() {
@@ -722,6 +732,7 @@ document.addEventListener('click', (e) => {
   const t = (sel) => e.target.closest(sel)
   let el
   if ((el = t('[data-run]'))) return selectRun(el.dataset.run)
+  if ((el = t('[data-clear]'))) { prefs.filter = 'all'; prefs.role = ''; prefs.phase = ''; return render() }
   if ((el = t('[data-filter]'))) { prefs.filter = el.dataset.filter; return render() }
   if ((el = t('[data-role]'))) { prefs.role = el.dataset.role; return render() }
   if ((el = t('[data-phase]'))) { prefs.phase = prefs.phase === el.dataset.phase ? '' : el.dataset.phase; return render() }
