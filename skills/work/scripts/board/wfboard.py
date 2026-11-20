@@ -304,6 +304,10 @@ def export_run(run_dir, now):
                 if a:
                     a["done"] = True
                     a["result"] = d.get("result")
+            elif d.get("agentId") and d.get("agentId") in agents:
+                a = agents[d["agentId"]]
+                a["done"] = True
+                a["result"] = None
             elif d.get("type") not in ("launched",):
                 other.append(d.get("type"))
     j_age = now - os.path.getmtime(jpath) if os.path.exists(jpath) else 1e9
@@ -341,7 +345,8 @@ def export_run(run_dir, now):
             first = info["first"] if first is None else min(first, info["first"])
         if info["last"]:
             last = info["last"] if last is None else max(last, info["last"])
-        status = ("FAIL" if a["result"] is None else verdict(a["result"])) if a["done"] else ("STOPPED" if finished else "RUN")
+        retried = any(agents[o]["label"].startswith(a["label"] + " (retry") for o in order if o != aid)
+        status = ("STOPPED" if retried and a["result"] is None else ("FAIL" if a["result"] is None else verdict(a["result"]))) if a["done"] else ("STOPPED" if finished or retried else "RUN")
         if a["label"] == "tickets" and a["result"]:
             r = a["result"]
             if isinstance(r, str):
@@ -744,7 +749,8 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
             add_art(rel)
         run_any = any(e["status"] == "RUN" for e in entries)
         if status in ("TODO", "RUN") and entries and all(e.get("run") for e in entries) and not run_any:
-            status = "DONE" if all(e["status"] in ("DONE", "PASS", "CHANGES") for e in entries) else status
+            settled = [e for e in entries if e["status"] != "STOPPED"]
+            status = "DONE" if settled and all(e["status"] in ("DONE", "PASS", "CHANGES") for e in settled) else status
         groups.append({"id": f"{s.get('phase', 'Other')}/{key}", "phase": s.get("phase", "Other"), "key": key,
                        "agents": entries, "cost": round(sum(e["cost"] for e in entries), 4), "running": run_any,
                        "status": "RUN" if run_any else status,
