@@ -50,7 +50,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    python3 $S/scripts/state.py init --run <branch> --name "<title>" [--issue <n>] [--session <this session id, if known>] [--no-app] [--team-off pm,ceo,design,senior|all]
    ```
 
-   It writes `.agent/state.json` with all 25 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
+   It writes `.agent/state.json` with all 26 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
 6. **Board.** Start it now, before any agent runs (`references/board.md`):
    - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Read its first line and give the owner the URL.
    - Cloud session (`CLAUDE_CODE_REMOTE` is set, or the owner cannot open localhost): write the snapshot (`--snapshot .agent/board.html`) and publish it with the Artifact tool; give the owner the link.
@@ -96,7 +96,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
    - `budgets: {build: 2, qa: 1}`.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
-4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
+4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
 5. **When the Workflow tool is missing** (a headless run), run the same stages with the Agent tool, in the order and with the prompts in `references/stages.md`, and record each stage as it finishes so the board stays current.
 
 ## 4. Media layers

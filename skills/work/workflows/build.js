@@ -11,6 +11,7 @@ export const meta = {
     { title: 'Agent QA', detail: 'one explorer per role in a real browser, recorded on video' },
     { title: 'UI after', detail: 'after screenshots, diff and the UI review (ui runs only)' },
     { title: 'Fix', detail: 'one QA fix round for QA majors and unexpected/broken UI shots' },
+    { title: 'Garden', detail: 'turns repeated findings into lint rules or structure tests; logs the rest' },
     { title: 'Evidence', detail: 'writes .agent/evidence.md for the owner (H2)' },
     { title: 'Sign-off', detail: 'PM checks every acceptance criterion; the CEO says SHIP or HOLD' },
   ],
@@ -49,6 +50,7 @@ const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const FEATURE_MAP = P.feature_map || ''
+const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
 
@@ -104,6 +106,7 @@ const UIREV = {
 }
 
 const PMREP = { type: 'object', properties: { met: { type: 'integer' }, total: { type: 'integer' }, not_met: { type: 'array', items: { type: 'string' } }, entry_point_ok: { type: 'boolean' }, summary: { type: 'string' } }, required: ['met', 'total', 'not_met', 'entry_point_ok', 'summary'] }
+const GARDEN_RES = { type: 'object', properties: { checks_added: { type: 'array', items: { type: 'object', properties: { rule: { type: 'string' }, file: { type: 'string' }, catches: { type: 'string' } }, required: ['rule', 'file', 'catches'] } }, logged: { type: 'array', items: { type: 'string' } }, skipped: { type: 'array', items: { type: 'object', properties: { finding: { type: 'string' }, why: { type: 'string' } }, required: ['finding', 'why'] } } }, required: ['checks_added', 'logged', 'skipped'] }
 const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix'] }
 
 // Who builds a ticket: tickets.json "role" (the architect sets it); "kind": "test" is always the test engineer.
@@ -289,6 +292,27 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
   } else if (qaMajors.length || uiFlags.length) log('QA findings left: QA budget used up; they go to the owner')
 }
 
+const gardenFindings = [
+  ...(result.verify || []).flatMap((r) => r.findings || []).map((f) => ({ from: 'verify', ...f })),
+  ...(result.qa || []).flatMap((r) => (r.findings || []).filter((f) => !f.existing_bug).map((f) => ({ from: `qa:${r.role}`, severity: f.severity, where: f.url || '', what: f.title }))),
+  ...(((result.ui && result.ui.review && result.ui.review.flagged) || []).map((f) => ({ from: 'ui', severity: 'major', where: f.id, what: f.note }))),
+]
+if (GARDEN && gardenFindings.length) {
+  phase('Garden')
+  result.garden = await run(
+    `You are the gardener for ${NAME} run ${A.run}. Your job is the codebase's guard rails, not this feature: every mistake an agent makes should become impossible next time.
+Read ${GARDEN.log} (the garden log: earlier findings, one entry each; create it if missing) and these findings from this run:
+${JSON.stringify(gardenFindings)}
+For each finding, decide:
+- the same pattern is already in the log, or appears ${GARDEN.repeat}+ times in this run: make it a deterministic check. Prefer, in order: an API or type change that makes the mistake impossible; a lint rule; a structure test (for example a test that fails on a forbidden import). Its error message tells the next agent the root-cause fix, not a workaround. Fix every existing occurrence so the check passes. Record it under "Checks" in the log.
+- a first sighting: append it to the log (date ${A.today || ''}, pattern in one line, where, run ${A.run}) and change no code.
+- not a pattern (a one-off typo, a product decision): skip it and say why.
+Never add a code comment, a doc line or an AGENTS.md rule in place of a check. Then run the gate:
+${GATE || "(the project's linters and unit tests)"}
+It must stay green; if a new check cannot pass yet, revert that check and log it instead. ${RULES}`,
+    { label: 'Gardener: findings into checks', phase: 'Garden', schema: GARDEN_RES, model: W })
+}
+
 // ------------------------------------------------ Evidence
 phase('Evidence')
 result.evidence = await run(
@@ -297,7 +321,7 @@ ${JSON.stringify(result)}
 Sections: what was built (plain words); test results as a role x browser table with NOT RUN where a browser did not run, plus flakes by name;
 gate table; verification verdict and what was fixed; agent QA counts and open findings grouped by theme (existing bugs labelled);
 UI before/after: every non-unchanged shot with its verdict (if .agent/ui/shots.json exists); videos: every file under .agent/video/ with role
-and kind; fix rounds used vs budget; stages with time; cost marked "estimated" unless measured; files touched (git status).
+and kind; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
 Short sentences, no hype. Return the first 3 lines of the file.`,
   { label: 'Evidence: report', phase: 'Evidence', model: W })
 
