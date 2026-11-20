@@ -61,6 +61,7 @@ When the profile is missing (or the owner says `/work setup`):
 | `app.fixtures` | QA | seeds test data; QA removes what it made |
 | `roles` | plan, QA, UI snap | include `signed-out` when there is a login |
 | `gate` | gate stage, ship | run in order, all of them |
+| `evals` | gate, plan | `{"cmd": "make eval", "paths": ["evals/", "internal/ai/"]}`: the gate runs `cmd` whenever a changed file is under one of `paths` (always, when `paths` is empty), and a failing or regressed eval turns the gate red; the architect adds eval cases for every AI change. Omit when the project has no AI features |
 | `e2e.cmd` (`{specs}`), `e2e.full`, `e2e.browsers` | gate, red run, ship | browsers not run are reported NOT RUN |
 | `ui_snap.dir`, `theme_key`, `hide`, `channel` | UI layer | `dir` must be inside the e2e package so Playwright resolves; `channel: "chrome"` uses the installed Chrome |
 | `video` | QA | false to never record |

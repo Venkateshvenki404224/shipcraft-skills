@@ -19,6 +19,7 @@
   "roles": ["admin", "user", "signed-out"],
 
   "gate": ["npm run lint", "npm run typecheck", "npm test"],
+  "evals": { "cmd": "make eval", "paths": ["evals/", "src/ai/"] },
   "e2e": {
     "dir": "tests/e2e",
     "cmd": "cd tests/e2e && npx playwright test {specs} --retries=0",

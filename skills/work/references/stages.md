@@ -41,7 +41,7 @@ Models come from the profile's `models` (`plan`, `approve`, `research`, `work`, 
 
 ## Gate
 
-The gate is the profile's `gate` list, run in order, all of them, then the profile's `e2e.cmd` with this feature's specs. When the project has one gate script (for example `make check` or `tools/gate.sh`), list only that. Run the full suite (`e2e.full`) at ship.
+The gate is the profile's `gate` list, run in order, all of them, then the profile's `e2e.cmd` with this feature's specs. When the project has one gate script (for example `make check` or `tools/gate.sh`), list only that. Run the full suite (`e2e.full`) at ship. When the profile has `evals`, the gate also runs `evals.cmd` if a changed file is under `evals.paths`; a failing eval makes the gate red, the same as a failing test.
 
 ## Budgets
 

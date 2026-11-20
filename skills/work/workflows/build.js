@@ -50,6 +50,7 @@ const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const FEATURE_MAP = P.feature_map || ''
+const EVALS = P.evals && P.evals.cmd ? { cmd: P.evals.cmd, paths: P.evals.paths || [] } : null
 const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
@@ -153,7 +154,9 @@ Gate commands, in order (stop at nothing; run them all):
 ${GATE || '(the profile lists no gate commands: run the project\'s linters and unit tests as its README or CI config describes, and say which)'}
 ${E2E ? `Then the end-to-end tests: ${E2E}
 Browsers expected: ${BROWSERS.join(', ')}. Per browser report PASS n/n, FAIL, or NOT RUN with the reason (a browser that is not installed is NOT RUN, never left out).` : 'There is no end-to-end command; report browsers as {}.'}
-If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.`,
+If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.${EVALS ? `
+AI evals: list the changed files (git diff --name-only HEAD plus untracked files). ${EVALS.paths.length ? `If any of them is under ${EVALS.paths.join(', ')}` : 'Always'}, run: ${EVALS.cmd}
+Report it as a check named "eval" with its scores; a failing or regressed eval is a failure and makes green false. When no matching file changed, report the check as "eval" with result "SKIP (no AI files changed)".` : ''}`,
   { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: W, effort: 'low' })
 
 const fix = (label, phaseName, what) => run(
