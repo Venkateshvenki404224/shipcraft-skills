@@ -1041,6 +1041,8 @@ def read_settings():
                    "ui_shots": src.get("ui_shots", True) is not False, "garden": src.get("garden", True) is not False},
         "team": {k: (t or {}).get(k, True) is not False for k in TEAM_KEYS}}
     return {"profile_path": os.path.relpath(prof_path, REPO) if prof_path else None,
+            "tier": {"repo": prof.get("tier") or "balanced", "run": over.get("tier")},
+            "knobs": {"repo": prof.get("knobs") or {}, "run": over.get("knobs") or {}},
             "available_models": prof.get("available_models") or ["opus", "sonnet", "haiku", "fable"],
             "model_fallback": prof.get("model_fallback"),
             "repo": view(prof, team), "run": over}
@@ -1059,6 +1061,30 @@ def apply_settings(scope, body):
     else:
         raise ValueError("scope must be repo or run")
     allowed = set(read_settings()["available_models"])
+    if "tier" in body:
+        if body["tier"] not in ("lean", "balanced", "max"):
+            raise ValueError("tier must be lean, balanced or max")
+        target["tier"] = body["tier"]
+    if "knobs" in body:
+        kn, out = body["knobs"] or {}, {}
+        checks = {"revisions": range(0, 4), "areas": range(1, 7), "outside": range(0, 5)}
+        for k, rng in checks.items():
+            if kn.get(k) not in (None, ""):
+                if int(kn[k]) not in rng:
+                    raise ValueError(f"{k} out of range")
+                out[k] = int(kn[k])
+        for k, opts in {"design_review": ("on", "off"), "seniors": ("none", "one", "all")}.items():
+            if kn.get(k) not in (None, "", "auto"):
+                if kn[k] not in opts:
+                    raise ValueError(f"bad {k}")
+                out[k] = kn[k]
+        eff = {r: v for r, v in (kn.get("effort") or {}).items() if v not in (None, "", "auto")}
+        for r, v in eff.items():
+            if r not in ("research", "pm", "ceo", "design", "plan", "review", "senior") or v not in ("low", "medium", "high"):
+                raise ValueError(f"bad effort {r}={v}")
+        if eff:
+            out["effort"] = eff
+        target["knobs"] = out
     for k, v in (body.get("models") or {}).items():
         if k not in MODEL_KEYS:
             raise ValueError(f"unknown model key {k}")

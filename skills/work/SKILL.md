@@ -23,6 +23,7 @@ You are the orchestrator. You do not write feature code yourself. You:
 |---|---|
 | `/work 123`, `/work #123`, `/work <issue URL>` | New run from GitHub issue 123 |
 | `/work <free text>` | New run from that text; no issue |
+| `/work <n> --tier lean\|balanced\|max` | Same, with a cost template for this run (written to `.agent/overrides.json`) |
 | `/work` alone | Ask what to build (one question), then start |
 | `/work setup [path]` | Write or update the profile only (`references/setup.md`); `path` picks where it is read and saved |
 | `/work approve [changes…]` | Owner gate H1 passed → build. With text: one re-plan applying it, then build |
@@ -68,7 +69,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    ```
    {"run": "<branch>", "issue": ".agent/issue.md", "title": "...", "today": "YYYY-MM-DD", "skill": "<absolute $S>", "profile": <the parsed profile>, "profilePath": "<PROFILE_PATH>", "autonomy": "<owner|agents for this mode>"}
 
-   **Per-run settings.** Before writing any workflow's args (plan, build, fixup, resume), read `.agent/overrides.json` if it exists (the board's Settings panel writes it with "this run only") and lay it over the profile: its `models` keys replace the profile's, and `video`, `qa`, `ui_shots`, `garden` and `team` values replace theirs. Say in one line what the overrides changed. The panel's "every run" scope edits the profile itself.
+   **Per-run settings.** Before writing any workflow's args (plan, build, fixup, resume), read `.agent/overrides.json` if it exists (the board's Settings panel writes it with "this run only") and lay it over the profile: its `models` keys replace the profile's, and `video`, `qa`, `ui_shots`, `garden`, `team`, `tier` and `knobs` values replace theirs. Pass `tier` and `knobs` in the args of every workflow. Say in one line what the overrides changed. The panel's "every run" scope edits the profile itself.
    ```
 
    Pass the date from your context; scripts cannot read the clock.
@@ -153,6 +154,18 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - `none`: the repository runs no CI on pull requests; say so.
    - `pending`: still running after 30 minutes; say which checks, and ask the owner whether to keep waiting.
 5. Run `state.py step ship --status DONE` (with the CI verdict in the summary) and `state.py finish`. Refresh the board one last time. Then report in one message: the PR link, the CI verdict per check, and what the owner does next (merge on green). Ask a closing question only when it changes something: do not offer to comment on the issue when the PR body already says `Closes #<n>` (GitHub links them and closes the issue on merge). Never comment unasked.
+
+## Cost templates (`tier`) and plan knobs
+
+`tier` picks one of three templates; the board's Settings panel (Cost) sets it with matching models, for one run or every run, and `/work <n> --tier <t>` sets it for one run.
+
+| Template | Models | Plan |
+|---|---|---|
+| `lean` | Sonnet plans, builds and reviews; Haiku for PM, CEO, designer, research, gate runs | up to 3 researchers and 1 outside question; small issues skip the CEO design review and the senior devs; 1 revision round; low effort for research, PM and CEO, medium for the rest |
+| `balanced` (default) | Opus for architect, approver, senior devs, verifiers; Sonnet builds; Haiku researches | up to 4 researchers, 2 outside questions; one senior dev unless the issue is large; CEO design review except on small issues; 2 revision rounds |
+| `max` | Fable plans and approves; Opus elsewhere | up to 6 researchers, 4 outside; full team on every issue; 2 revision rounds |
+
+The scope agent rates each issue `small`, `medium` or `large`; the plan uses that with the template. `knobs` override single parts of the template: `revisions` (0–3), `areas` (1–6), `outside` (0–4), `design_review` (`on`/`off`), `seniors` (`none`/`one`/`all`), and `effort` per role (`research`, `pm`, `ceo`, `design`, `plan`, `review`, `senior`: `low`/`medium`/`high`). Report the template, the size and every knob in the evidence and on the board, so a cheap run is visibly cheap.
 
 ## Chains: `/work chain <n> <n> …`
 
