@@ -11,7 +11,6 @@ Find it in this order and stop at the first hit:
 1. A path the owner gave: `/work setup <path>`, or `--profile <path>` on any `/work` call.
 2. The `WORK_PROFILE` environment variable.
 3. `.work-profile/work.json`.
-4. `.claude/work.json` (older location: read it, and offer once to move it to `.work-profile/`).
 
 Call the result `PROFILE_PATH`. Pass it to every workflow as `args.profilePath`. The rest of this skill says "the profile" for this file. Review rules and other files the setup writes go in the same `.work-profile/` folder (`.work-profile/review-rules.md`).
 
@@ -19,7 +18,7 @@ Call the result `PROFILE_PATH`. Pass it to every workflow as `args.profilePath`.
 
 The skill ships no model names. Setup finds the real ones:
 
-1. Run `python3 $S/scripts/detect_models.py`. It returns the host (`claude`, `codex`, `copilot` or `unknown`), the models that host offers, and the model the host is configured to use. If `host` is `unknown` or `models` is empty, ask the owner which host they use and which models it offers.
+1. Run `python3 $S/scripts/detect_models.py`. It finds each host's binary on PATH or inside the app or editor extension that bundles it (Claude Code in the terminal, the VS Code/Cursor extension or the desktop app; Codex CLI or its VS Code extension; Copilot CLI or `gh copilot`), then reads the models: Claude's `--model` aliases, Codex's `debug models` catalog, and for Copilot `auto` plus its configured model (Copilot has no list command; `/model` is interactive). It returns the running `host`, its `models` and `configured` model, and `by_host` for every host found. If `host` is `unknown`, offer the hosts in `by_host` and ask which one the owner uses. If `models` is empty or the host is Copilot, ask the owner which models to add.
 2. Write into the profile: `host`, `available_models` (the list), `model_fallback` (the host's configured model if it is in the list, else the first model listed), and `models` (below).
 3. Fill `models` only from `available_models`. Suggest: `plan` and `approve` the most capable listed model, `research` and `work` a cheaper one; with one model, use it everywhere. Show the table and ask with AskUserQuestion ("Use these" / "Change them" / "Stop"). Other models are accepted; the owner may type any model the host supports.
 4. Any role with no model later uses `model_fallback`. A workflow with neither stops with an error.
