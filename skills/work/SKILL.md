@@ -28,6 +28,9 @@ You are the orchestrator. You do not write feature code yourself. You:
 | `/work approve [changes…]` | Owner gate H1 passed → build. With text: one re-plan applying it, then build |
 | `/work ship` · `/work fix then ship: <themes>` | Owner gate H2 → ship (§6), or one more fix round, then ship |
 | `/work status` | Print the stage table (`state.py show`), the board link, and what waits on whom |
+| `/work chain <n> <n> …` | Build several issues one after another, unattended, each stacked on the previous issue's branch, one draft PR each (§ Chains) |
+| `/work chain merge` | Owner only: merge the chain's PRs bottom-up once CI is green (§ Chains) |
+| `/work lanes <n> <n> …` | Run independent issues in parallel, one worktree and port set each (§ Lanes) |
 | `/work resume` | A workflow stopped (network drop, API error, closed laptop): continue it from where it stopped (§ Recovery) |
 | `/work board` | Start the board again (or republish the snapshot) and give the link |
 
@@ -38,7 +41,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 1. **Check the base.**
    - `git status` must show no tracked changes, or only this run's changes.
    - Check `.agent/`. If it belongs to another unfinished run (`state.json` with `"finished": false` and another `run`), stop and ask. Never delete another run's state.
-2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.work-profile/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
+2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.agent/profile.json` (a lane's own profile, written by `lanes.py`), `.work-profile/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
 3. **Write the request into `.agent/issue.md`.**
    - From an issue: `gh issue view <n> --json number,title,body,labels,comments,author`. Quote the title, body and comments verbatim under headings.
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
@@ -148,6 +151,28 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - `none`: the repository runs no CI on pull requests; say so.
    - `pending`: still running after 30 minutes; say which checks, and ask the owner whether to keep waiting.
 5. Run `state.py step ship --status DONE` (with the CI verdict in the summary) and `state.py finish`. Refresh the board one last time. Then report in one message: the PR link, the CI verdict per check, and what the owner does next (merge on green). Ask a closing question only when it changes something: do not offer to comment on the issue when the PR body already says `Closes #<n>` (GitHub links them and closes the issue on merge). Never comment unasked.
+
+## Chains: `/work chain <n> <n> …`
+
+For dependent issues the owner wants built while away (4, then 5 on top of 4, then 6 on top of 5). Invoking a chain is the owner's standing OK for these issues only: H1 passes when the verifier and the approval agent both APPROVE, H2 when the gate and CI are green and the CEO says SHIP, and the run pushes its branch and opens a **draft** PR without asking. Nothing is ever merged by a chain.
+
+1. Start it once: `python3 $S/scripts/chain.py start <n> <n> … --base <branch> [--base-pr <pr>]`. `--base` is `origin/<base>`'s branch, or the branch of a run whose PR is still open (then pass its PR as `--base-pr`).
+2. Loop: `chain.py next` prints `next: #<n> base <branch>`; stop when it prints `done` or `stopped`.
+   - Intake as usual, but create the run branch from `origin/<that base branch>` (fetch it first), and `chain.py begin <n> --branch <run branch>`.
+   - Run plan and build exactly as in §2–§5, with the gates decided as above. A REVISE after 2 plan rounds, a red gate when the budget is spent, or a CEO HOLD after one fix round stops the chain: `chain.py stop <n> --reason "<one line>"`, and the issues after it are skipped.
+   - Ship: rebase onto `origin/<base branch>`, run the gate and the ship checks, push, and `gh pr create --draft --base <base branch>` with "Stacked on #<previous PR>" as the body's last line. Wait with `ci_wait.py`: `green` and `owner` (only the one-way-doors label is missing) both count as shipped; `red` gets the fix rounds, then stops the chain.
+   - `chain.py shipped <n> --pr <pr> --branch <run branch> [--note "needs migration-reviewed"]`, `state.py finish`, then the next issue.
+3. At the end (or the stop), tell the owner in a few lines: the chain table (`chain.py show`), what needs them (labels, a stop reason), and that `/work chain merge` merges everything in order.
+
+`/work chain merge` (only when the owner asks): `python3 $S/scripts/chain.py merge` marks each PR ready, waits for its CI (an `owner` verdict means a missing label: stop and say so), merges it with a merge commit and deletes its branch, so GitHub retargets the next PR to the base, then moves on. Run it with `--dry-run` first and show the commands.
+
+## Lanes: `/work lanes <n> <n> …`
+
+For issues that do not depend on each other (no shared files, neither needs the other's code). First check that from the issues and the code; if one needs another, say so and offer a chain instead. Lanes need the profile's `lanes` section (`references/setup.md`).
+
+1. For each issue: `python3 $S/scripts/lanes.py add <n> --slug <slug>`. It creates `../<repo>-lane-<n>` on its own branch from `origin/<base>`, picks free ports, and writes `.agent/profile.json` there: the profile with that lane's app URL and every command prefixed with its port variables.
+2. Tell the owner to open one Claude Code session per lane folder (the plugin must be installed at user scope, or the lane copies `.claude/settings.local.json`) and run `/work <n>` in each. Each lane has its own board, dev server and `.agent/`, so they run side by side.
+3. `lanes.py list` shows the lanes; `lanes.py remove <n>` removes a lane once its branch is pushed.
 
 ## Recovery: `/work resume`
 

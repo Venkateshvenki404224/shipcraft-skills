@@ -687,7 +687,7 @@ _app_seen = {}
 
 
 def app_info(root, now):
-    paths = [os.environ.get("WORK_PROFILE") or "", os.path.join(root, ".work-profile", "work.json"), os.path.join(root, ".claude", "work.json")]
+    paths = [os.environ.get("WORK_PROFILE") or "", os.path.join(root, ".agent", "profile.json"), os.path.join(root, ".work-profile", "work.json"), os.path.join(root, ".claude", "work.json")]
     prof = next((p for p in paths if p and os.path.isfile(p if os.path.isabs(p) else os.path.join(root, p))), None)
     if not prof:
         return None

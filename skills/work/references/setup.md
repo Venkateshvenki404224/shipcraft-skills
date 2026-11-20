@@ -10,7 +10,8 @@ Find it in this order and stop at the first hit:
 
 1. A path the owner gave: `/work setup <path>`, or `--profile <path>` on any `/work` call.
 2. The `WORK_PROFILE` environment variable.
-3. `.work-profile/work.json`.
+3. `.agent/profile.json`: a parallel lane's profile, written by `scripts/lanes.py` with that lane's ports. Never edit it by hand.
+4. `.work-profile/work.json`.
 
 Call the result `PROFILE_PATH`. Pass it to every workflow as `args.profilePath`. The rest of this skill says "the profile" for this file. Review rules and other files the setup writes go in the same `.work-profile/` folder (`.work-profile/review-rules.md`).
 
@@ -74,3 +75,21 @@ When the profile is missing (or the owner says `/work setup`):
 | `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs") |
 | `ship.mode` | ship | `pr` (default) or `squash` |
 | `ship.auto_push` | ship | with `autonomy: agents` only: push the run branch after each commit (never the base branch, never a PR) |
+
+## Lanes (parallel runs)
+
+`/work lanes` runs independent issues side by side, each in its own git worktree. Each lane needs its own ports, so the profile says which ports exist and how commands receive them:
+
+```
+"lanes": {
+  "url": "http://localhost:{port}",
+  "health": "/healthz",
+  "ports": { "port": 8090, "e2e_port": 8099 },
+  "step": 10,
+  "env": { "DEV_ADDR": ":{port}", "APP_E2E_PORT": "{e2e_port}" },
+  "copy": [".claude/settings.local.json"]
+}
+```
+
+Lane k gets every port plus k × `step`. Every gate, e2e and app command in the lane's profile runs with `env` set, so the project's scripts must read those variables (a dev server address, a test server port, a Docker project name). Leave `lanes` out when the project cannot run twice on one machine.
+
