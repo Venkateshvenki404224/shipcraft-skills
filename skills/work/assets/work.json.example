@@ -3,7 +3,7 @@
   "base": "main",
   "branch_prefix": "agent/",
   "rules": ["CLAUDE.md"],
-  "review_rules": ".claude/work-review-rules.md",
+  "review_rules": ".work-profile/review-rules.md",
   "secrets": [".env*", "tests/e2e/.auth/*"],
 
   "app": {

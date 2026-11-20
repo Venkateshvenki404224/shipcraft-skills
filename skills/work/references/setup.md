@@ -1,4 +1,4 @@
-# Project profile (default `.claude/work.json`)
+# Project profile (default `.work-profile/work.json`)
 
 The skill is generic. Everything it must know about one project lives in that project's profile (`P` below), committed so every session and every teammate gets the same answers. The format, with every field, is `assets/work.json.example`. Agents never guess these values; a missing profile is why a /work run gets lost.
 
