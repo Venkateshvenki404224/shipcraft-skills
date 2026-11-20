@@ -36,7 +36,10 @@
   },
   "autonomy": "owner",
 
-  "models": { "plan": "opus", "approve": "opus", "research": "sonnet", "work": "sonnet",
-              "pm": "opus", "ceo": "opus", "design": "opus", "senior": "opus", "verify": "opus" },
+  "host": "claude",
+  "available_models": ["<written by scripts/detect_models.py>"],
+  "model_fallback": "<one of available_models: used by any role with no model>",
+  "models": { "plan": "<model>", "approve": "<model>", "research": "<model>", "work": "<model>",
+              "pm": "<model, optional>", "ceo": "<optional>", "design": "<optional>", "senior": "<optional>", "verify": "<optional>" },
   "ship": { "mode": "pr", "auto_push": false }
 }

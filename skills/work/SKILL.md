@@ -7,7 +7,7 @@ description: Build a feature end to end with an agent pipeline, in any repositor
 
 You are the orchestrator. You do not write feature code yourself. You:
 1. take in the request;
-2. make sure the repo has a profile (default `.claude/work.json`, but the location is resolved, see `references/setup.md`), with the models the owner chose, and write one with the owner if it does not;
+2. make sure the repo has a profile (default `.work-profile/work.json`; the location is resolved, see `references/setup.md`), with models detected from the host and confirmed by the owner, and write one with the owner if it does not;
 3. start the run board, so the owner sees every stage live;
 4. write the workflow files for this run from the templates in `workflows/`, and run them with the Workflow tool;
 5. stop at the two owner gates;
@@ -37,7 +37,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 1. **Check the base.**
    - `git status` must show no tracked changes, or only this run's changes.
    - Check `.agent/`. If it belongs to another unfinished run (`state.json` with `"finished": false` and another `run`), stop and ask. Never delete another run's state.
-2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.claude/work.json`, `.work-profile`; if none exists and there is no `.claude/`, ask the owner where to save it). Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check `models`: if `plan`, `approve`, `research` or `work` is missing, ask the owner for each ("Models" in setup.md) and save the answers. Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
+2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.work-profile/work.json`, then the old `.claude/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
 3. **Write the request into `.agent/issue.md`.**
    - From an issue: `gh issue view <n> --json number,title,body,labels,comments,author`. Quote the title, body and comments verbatim under headings.
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
@@ -145,7 +145,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
 
 ## Unattended runs (`"autonomy": "agents"`)
 
-Only when the profile says `"autonomy": "agents"`. Setup never writes it and never offers it: it exists only if the owner edited the file by hand, which is their standing OK. The default and the setup value is `"owner"`: the owner decides at H1 and H2. If the owner did set `agents`, the team stands in for the owner:
+Only when the profile says `"autonomy": "agents"`. Setup asks this on first use and the default is `"owner"` (the owner decides at H1 and H2); `agents` is written only when the owner picks it, and that choice is their standing OK. Then the team stands in for the owner:
 - **H1** passes when the verifier and the approval agent both APPROVE, after the PM's decisions. If they still say REVISE after 2 rounds, stop and report.
 - **H2** passes when the gate is green and the CEO signs off SHIP. A CEO HOLD gets one fix round on its `must_fix` items (build.js `mode: "fixup"`), then a second sign-off; still HOLD = stop and report.
 - **Ship** = commit on the run branch, in small commits. Push the branch only when `ship.auto_push` is true. Never merge into the base branch, never open a pull request, never post anywhere: those wait for the owner.

@@ -1,6 +1,6 @@
 # Review rules (verify and UI review agents)
 
-These are the rules every project gets. The project adds its own in the file the profile names as `review_rules` (for example `.claude/work-review-rules.md`); a project rule wins over a rule here.
+These are the rules every project gets. The project adds its own in the file the profile names as `review_rules` (for example `.work-profile/review-rules.md`); a project rule wins over a rule here.
 
 Every finding cites one heading from these files, or names a concrete failing behaviour (input → wrong output). A finding that does neither is an opinion; leave it out. Before you report anything, confirm it in the code or the browser: a wrong finding costs the author more time than a missed one.
 
