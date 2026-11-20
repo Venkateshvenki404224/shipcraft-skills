@@ -322,6 +322,7 @@ def export_run(run_dir, now):
     tickets = {}
     groups, gindex = [], {}
     total_cost, first, last = 0.0, None, None
+    prompt_head = ""
     for aid in order:
         a = agents[aid]
         apath = os.path.join(run_dir, f"agent-{aid}.jsonl")
@@ -333,6 +334,9 @@ def export_run(run_dir, now):
             except Exception:
                 pass
         total_cost += info["cost"]
+        if os.path.exists(apath):
+            with open(apath, encoding="utf-8", errors="replace") as fh:
+                prompt_head += fh.read(20000)
         if info["first"]:
             first = info["first"] if first is None else min(first, info["first"])
         if info["last"]:
@@ -447,6 +451,7 @@ def export_run(run_dir, now):
         "phases": cols, "groups": groups, "artifacts": arts,
         "agents": len(agents), "running": running, "cost": round(total_cost, 2),
         "started": first, "updated": last, "elapsed": ((now if not finished else (last or now)) - first) if first else 0,
+        "_prompt_head": prompt_head,
     }
 
 
@@ -470,6 +475,49 @@ def find_runs(project_dirs):
 # Agent transcripts are found as <project>/<session>/subagents/agent-<id>.jsonl.
 
 STALE = 900  # a running agent with no transcript write for this long is flagged
+
+STEP_RULES = [
+    ("research", r"^(Scope|Researcher):"),
+    ("prd", r"^PM: product brief"),
+    ("ceo-scope", r"^CEO: scope"),
+    ("plan", r"^Architect: plan"),
+    ("design", r"^(UI/UX designer: (design|revise)|CEO: design review)"),
+    ("feasibility", r"^Senior .*: feasibility"),
+    ("pm-decisions", r"^(PM: decide|Architect: apply decisions)"),
+    ("approve", r"^(Verifier: plan|Approver: plan|Architect: revise)"),
+    ("red", r"^(Gate: red run|Tester: fix the red run)"),
+    ("tests", r"^Tester:"),
+    ("ui-before", r"^UI snap: before"),
+    ("ui-after", r"^(UI snap: after|UI/UX designer: shots|UI reviewer: shots)"),
+    ("qa", r"^QA:"),
+    ("garden", r"^Gardener:"),
+    ("evidence", r"^Evidence:"),
+    ("pm-report", r"^PM: acceptance"),
+    ("ceo-signoff", r"^CEO: sign-off"),
+]
+PHASE_STEP = {"Implement": "implement", "Gate + E2E": "gate", "Verify": "verify", "Fix": "qa-fix"}
+
+
+def step_of(label, phase):
+    for key, rx in STEP_RULES:
+        if re.search(rx, label or ""):
+            return key
+    return PHASE_STEP.get(phase)
+
+
+def workflow_agents(wf_runs, run_name):
+    linked = {}
+    tag = re.compile(r"\brun " + re.escape(run_name) + r"\b") if run_name else None
+    for r in sorted(wf_runs, key=lambda r: r.get("started") or 0):
+        if not tag or not tag.search(r.get("_prompt_head") or ""):
+            continue
+        for g in r.get("groups", []):
+            for a in g.get("agents", []):
+                key = step_of(a.get("label"), g.get("phase"))
+                if key and not str(a.get("id", "")).startswith("ticket-"):
+                    role = (a.get("label") or "").split(":")[0].strip() or "Agent"
+                    linked.setdefault(key, []).append(dict(a, run=r["id"], step=role))
+    return linked
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
 
 
@@ -585,8 +633,9 @@ def export_video(root, base, run_id):
     return out
 
 
-def export_pipeline(manifest, project_dirs, now):
+def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     m = json.load(open(manifest, encoding="utf-8"))
+    linked = workflow_agents(wf_runs, m.get("run"))
     root = os.path.dirname(os.path.dirname(manifest))
     run_id = "pl_" + re.sub(r"[^A-Za-z0-9_-]+", "-", m.get("run") or os.path.basename(root)).strip("-")[:48]
     base = os.path.join(OUT, run_id)
@@ -645,8 +694,15 @@ def export_pipeline(manifest, project_dirs, now):
                             "tokens_out": info["tokens_out"], "started": info["first"],
                             "elapsed": (end - info["first"]) if (info["first"] and end) else 0,
                             "ended": None if ast == "RUN" else info["last"], "last": lastline})
+        if not entries and (linked or {}).get(key):
+            for a in linked[key]:
+                n_agents += 1
+                n_running += a.get("status") == "RUN"
+                total_cost += a.get("cost") or 0
+                if a.get("started"):
+                    first = a["started"] if first is None else min(first, a["started"])
+                entries.append(a)
         if not entries:
-            # A step with no agent: an owner gate, or a check the orchestrator runs itself.
             sid = f"step-{re.sub(r'[^A-Za-z0-9_-]+', '-', key)}"
             detail = s.get("detail") or ""
             detail = "\n".join(detail) if isinstance(detail, list) else str(detail)
@@ -660,6 +716,8 @@ def export_pipeline(manifest, project_dirs, now):
         for rel in s.get("artifacts") or []:
             add_art(rel)
         run_any = any(e["status"] == "RUN" for e in entries)
+        if status in ("TODO", "RUN") and entries and all(e.get("run") for e in entries) and not run_any:
+            status = "DONE" if all(e["status"] in ("DONE", "PASS", "CHANGES") for e in entries) else status
         groups.append({"id": f"{s.get('phase', 'Other')}/{key}", "phase": s.get("phase", "Other"), "key": key,
                        "agents": entries, "cost": round(sum(e["cost"] for e in entries), 4), "running": run_any,
                        "status": "RUN" if run_any else status,
@@ -713,21 +771,25 @@ def export_pipeline(manifest, project_dirs, now):
 def export_once(project_dirs, pipeline_globs):
     now = time.time()
     try:
+        wf_runs = []
+        for r in find_runs(project_dirs):
+            try:
+                wf_runs.append(export_run(r, now))
+            except Exception as e:  # keep the board alive on a bad file
+                wf_runs.append({"id": os.path.basename(r), "name": os.path.basename(r), "state": "error", "error": str(e),
+                                "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0, "cost": 0, "elapsed": 0})
         runs = []
         pl = sorted({p for g in pipeline_globs for p in glob.glob(os.path.expanduser(g))}, key=os.path.getmtime, reverse=True)
         for p in pl[:MAX_RUNS]:
             try:
-                runs.append(export_pipeline(p, project_dirs, now))
+                runs.append(export_pipeline(p, project_dirs, now, wf_runs))
             except Exception as e:  # a half-written manifest must not take the board down
                 runs.append({"id": "pl_" + os.path.basename(os.path.dirname(os.path.dirname(p))), "name": p, "state": "error",
                              "error": f"{p}: {e}", "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0,
                              "cost": 0, "elapsed": 0})
-        for r in find_runs(project_dirs):
-            try:
-                runs.append(export_run(r, now))
-            except Exception as e:  # keep the board alive on a bad file
-                runs.append({"id": os.path.basename(r), "name": os.path.basename(r), "state": "error", "error": str(e),
-                             "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0, "cost": 0, "elapsed": 0})
+        runs.extend(wf_runs)
+        for r in runs:
+            r.pop("_prompt_head", None)
         state = {"generated": now, "project": project_dirs, "runs": runs}
     except Exception as e:
         state = {"generated": now, "error": str(e), "runs": []}
