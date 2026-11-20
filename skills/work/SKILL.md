@@ -142,7 +142,12 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - `squash`: `git checkout <base> && git merge --squash <branch>`, commit with a feature-level message, then ask once before `git push origin <base>`.
 
    End the commit message with the attribution lines the session gives you.
-4. Run `state.py step ship --status DONE` and `state.py finish`. Refresh the board one last time. If the run came from an issue, offer to comment the link on it. Do not comment unasked.
+4. **Wait for CI before anything else** (`pr` mode): run `python3 $S/scripts/ci_wait.py <pr number>` (it waits up to 30 minutes and prints one verdict).
+   - `green`: go on.
+   - `red`: read the failing checks' logs (`gh run view <id> --log-failed`), fix on the same branch while the build budget lasts, push (the PR updates), and wait again. When the budget is spent, report the failures to the owner and stop.
+   - `none`: the repository runs no CI on pull requests; say so.
+   - `pending`: still running after 30 minutes; say which checks, and ask the owner whether to keep waiting.
+5. Run `state.py step ship --status DONE` (with the CI verdict in the summary) and `state.py finish`. Refresh the board one last time. Then report in one message: the PR link, the CI verdict per check, and what the owner does next (merge on green). Ask a closing question only when it changes something: do not offer to comment on the issue when the PR body already says `Closes #<n>` (GitHub links them and closes the issue on merge). Never comment unasked.
 
 ## Recovery: `/work resume`
 
