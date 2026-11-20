@@ -64,6 +64,7 @@ When the profile is missing (or the owner says `/work setup`):
 | `e2e.cmd` (`{specs}`), `e2e.full`, `e2e.browsers` | gate, red run, ship | browsers not run are reported NOT RUN |
 | `ui_snap.dir`, `theme_key`, `hide`, `channel` | UI layer | `dir` must be inside the e2e package so Playwright resolves; `channel: "chrome"` uses the installed Chrome |
 | `video` | QA | false to never record |
+| `garden` | gardener | `{"log": "docs/garden.md", "repeat": 2}` by default: where findings are logged and how many sightings make a check; `false` turns the gardener off |
 | `feature_map` | architect, designer, QA, UI review | path to a Markdown map of every screen, panel and action from the user's point of view (name, where it lives, how to reach it, roles). Shared names for owner and agents; plans keep it current |
 | `host`, `available_models` | setup | written by `detect_models.py`: the host and the models it offers |
 | `model_fallback` | workflows | the model any role without one uses; one of `available_models` |

@@ -37,6 +37,6 @@ One run per checkout. The folder is never committed: add `.agent/` to `.git/info
  "artifacts": [".agent/issue.md"], "finished": false}
 ```
 
-- `init` writes all 25 stages as TODO, so the board and `show` have the full table from the first minute.
+- `init` writes all 26 stages as TODO, so the board and `show` have the full table from the first minute.
 - Workflow runs also appear on the board on their own (`wf_*`, read from the session's workflow journal). The manifest adds what a journal cannot show: the owner's gates, the stages the orchestrator runs inline, the screenshots and the videos.
 - The board serves `.agent/ui/` and `.agent/video/` through symlinks, so new screenshots and videos show up as soon as they are written.

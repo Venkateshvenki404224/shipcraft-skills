@@ -23,6 +23,7 @@ A /work run is staffed like a small product company. Each agent has one job, wri
 | **Verifier** (diff) | Verify | `verify` (low risk: `work`) | the diff, review rules | (findings) | one lens, or three at high risk: correctness, security and roles, UI rules |
 | **QA: `<role>`** | Agent QA | `work` | plan, `prd.md`, test plan | `.agent/qa/<role>.json`, videos | explores as that role from where the role really starts; finds the feature the way a user would |
 | **UI/UX designer** (shots) | UI after | `design` | before/after shots, `design.md` | `.agent/ui/review.json` | expected / unexpected / broken per changed shot, plus "does not match the design" |
+| **Gardener** | Garden | `work` | verify, QA and UI findings, the garden log | lint rules, structure tests, the garden log | a pattern seen before (or repeated in this run) becomes a deterministic check with a root-cause error message; a first sighting is logged; never a comment or doc rule instead of a check |
 | Evidence | Evidence | `work` | everything | `.agent/evidence.md` | the H2 report |
 | **PM** (acceptance) | Sign-off | `pm` | `prd.md`, `pm.md`, evidence, QA | `.agent/pm-report.md` | each acceptance criterion met / partly / not met, with evidence; the entry point works |
 | **CEO** (sign-off) | Sign-off | `ceo` | `ceo.md`, `pm-report.md`, evidence, QA | `.agent/ceo-signoff.md` | SHIP or HOLD with must-fix items. With `autonomy: agents` this replaces H2 |
@@ -38,6 +39,8 @@ With a `feature_map` in the profile, the architect, the designer, QA and the UI 
 - **PM decisions.** Open questions are where an unattended run stalls. The PM answers them with reasons, and the owner sees them as defaults at H1.
 - **Verifier and approver.** One fixes and attacks the plan against the code; the other checks the plan rules. Either one alone has let wrong paths or untestable cases through.
 - **Developer roles per ticket.** A backend prompt that stresses role checks and idempotency, and a UI prompt that stresses the design and every state, catch different mistakes than one generic "developer".
+
+- **Gardener.** A rule in prose can be ignored; a lint rule cannot. Turning every repeated agent mistake into a check means the next run cannot repeat it, and the review has less to look for. First sightings go to a log so one-offs do not become rules.
 
 ## Turning members off
 
