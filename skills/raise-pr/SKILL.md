@@ -6,7 +6,7 @@ description: Lint, commit, push and open a PR with screenshots and an at-a-glanc
 Raise a pull request for the current work. Take the base branch, whether to merge, and a line on what the
 change is for from the user's request.
 
-1. **Branch.** If on the base branch, or the current branch's pull request is already merged or closed (`gh pr list --head <branch> --state all`), or every commit on it is already in `origin/<base>`, create `type/short-slug` from `origin/<base>` first, carrying the uncommitted changes (`git switch -c <name> origin/<base>`). Never commit onto a merged branch. Base = the branch named in the
+1. **Branch.** If on the base branch, or the current branch's pull request is already merged or closed (`gh pr list --head <branch> --state all`), or every commit on it is already in `origin/<base>`, create `type/short-slug` from `origin/<base>` first, carrying the uncommitted changes (`git switch -c <name> origin/<base>`). Never commit onto a merged branch. When the branch already has an open PR, the new commits join it: push, then rewrite that PR's description to cover every commit on the branch instead of opening a second PR. Base = the branch named in the
    request, else the repo default (`gh repo view --json defaultBranchRef`). Confirm the base exists on
    `origin` — a local-only `main` is not a valid base.
 2. **Strip comments.** Remove every comment and docstring the branch adds (`git diff <base>...` plus
