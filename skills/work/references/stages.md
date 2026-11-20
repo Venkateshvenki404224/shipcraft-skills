@@ -26,7 +26,7 @@ After every stage: `python3 $S/scripts/state.py step <key> --status <status> --s
 | 14 | UI + video | `ui-before` | UI snap (if `ui`) | `.agent/ui/before/` | shots taken on the base code |
 | 15 | Implement | `implement` | Backend dev / Frontend dev / UI dev / Data dev / Tech writer, by ticket `role`, in dependency waves | product files | files written |
 | 16 | Gate + E2E | `gate` | Gate runs; Fixer fixes | none | all checks green; ≤2 build fix rounds |
-| 17 | Verify | `verify` | low: Sonnet ×1 · medium: Opus ×1 · high: Opus ×3 lenses | none | no blocker/major/minor left, or the budget is reported as spent |
+| 17 | Verify | `verify` | low: `models.work` ×1 · medium: `models.verify` ×1 · high: `models.verify` ×3 lenses | none | no blocker/major/minor left, or the budget is reported as spent |
 | 18 | Agent QA | `qa` | one QA agent per role, in parallel, on video | `.agent/qa/<role>.json`, `.agent/video/` | the findings files are written |
 | 19 | UI + video | `ui-after` | capture + UI/UX designer review (UI reviewer when the designer is off) | `.agent/ui/{after,diff,marked}/`, `shots.json`, `review.json` | review written |
 | 20 | Agent QA | `qa-fix` | Fixer, ≤1 round | product files | QA majors and unexpected/broken shots fixed, gate green again |

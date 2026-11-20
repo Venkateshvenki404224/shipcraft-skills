@@ -7,7 +7,7 @@ description: Build a feature end to end with an agent pipeline, in any repositor
 
 You are the orchestrator. You do not write feature code yourself. You:
 1. take in the request;
-2. make sure the repo has a profile (`.claude/work.json`), and write one with the owner if it does not;
+2. make sure the repo has a profile (default `.work-profile/work.json`; the location is resolved, see `references/setup.md`), with models detected from the host and confirmed by the owner, and write one with the owner if it does not;
 3. start the run board, so the owner sees every stage live;
 4. write the workflow files for this run from the templates in `workflows/`, and run them with the Workflow tool;
 5. stop at the two owner gates;
@@ -24,7 +24,7 @@ You are the orchestrator. You do not write feature code yourself. You:
 | `/work 123`, `/work #123`, `/work <issue URL>` | New run from GitHub issue 123 |
 | `/work <free text>` | New run from that text; no issue |
 | `/work` alone | Ask what to build (one question), then start |
-| `/work setup` | Write or update `.claude/work.json` only (`references/setup.md`) |
+| `/work setup [path]` | Write or update the profile only (`references/setup.md`); `path` picks where it is read and saved |
 | `/work approve [changes…]` | Owner gate H1 passed → build. With text: one re-plan applying it, then build |
 | `/work ship` · `/work fix then ship: <themes>` | Owner gate H2 → ship (§6), or one more fix round, then ship |
 | `/work status` | Print the stage table (`state.py show`), the board link, and what waits on whom |
@@ -37,7 +37,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 1. **Check the base.**
    - `git status` must show no tracked changes, or only this run's changes.
    - Check `.agent/`. If it belongs to another unfinished run (`state.json` with `"finished": false` and another `run`), stop and ask. Never delete another run's state.
-2. **Profile.** Read `.claude/work.json`. If it is missing, run the first-run setup in `references/setup.md` now and get the owner's OK before you go on. Never guess the gate, the app URL or the roles: a run without a profile is the run that gets lost.
+2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.work-profile/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
 3. **Write the request into `.agent/issue.md`.**
    - From an issue: `gh issue view <n> --json number,title,body,labels,comments,author`. Quote the title, body and comments verbatim under headings.
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
@@ -62,7 +62,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 2. Write `.agent/workflow/plan.args.json`:
 
    ```
-   {"run": "<branch>", "issue": ".agent/issue.md", "title": "...", "today": "YYYY-MM-DD", "skill": "<absolute $S>", "profile": <the parsed .claude/work.json>}
+   {"run": "<branch>", "issue": ".agent/issue.md", "title": "...", "today": "YYYY-MM-DD", "skill": "<absolute $S>", "profile": <the parsed profile>, "profilePath": "<PROFILE_PATH>"}
    ```
 
    Pass the date from your context; scripts cannot read the clock.
@@ -89,7 +89,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
 1. **Read the run's inputs:** `tickets.json`, `test-plan.json`, and the plan's `risk`, `ui`, `roles` and `specs`.
 2. **Prepare the media layers** (`references/media.md`): when `ui` is true, put the ui-snap tool in place and build the `uiSnap` command. Check `command -v agent-browser ffmpeg`; when either is missing, or the profile says `"video": false`, video is off and the evidence says why.
 3. **Write the files.** Load `workflow-authoring`. Copy `$S/workflows/build.js` to `.agent/workflow/build.js`, and write `build.args.json` with:
-   - `run`, `today`, `skill` (absolute `$S`), `profile` (parsed);
+   - `run`, `today`, `skill` (absolute `$S`), `profile` (parsed), `profilePath`;
    - `tickets` (verbatim from tickets.json), `roles`, `risk`, `ui`;
    - `e2e`: the profile's `e2e.cmd` with `{specs}` replaced by the plan's specs;
    - `uiSnap` (ui runs), `video`;
@@ -145,7 +145,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
 
 ## Unattended runs (`"autonomy": "agents"`)
 
-Only when the profile says `"autonomy": "agents"` (the owner wrote it, so it is their standing OK). The agent team then stands in for the owner:
+Only when the profile says `"autonomy": "agents"`. Setup asks this on first use and the default is `"owner"` (the owner decides at H1 and H2); `agents` is written only when the owner picks it, and that choice is their standing OK. Then the team stands in for the owner:
 - **H1** passes when the verifier and the approval agent both APPROVE, after the PM's decisions. If they still say REVISE after 2 rounds, stop and report.
 - **H2** passes when the gate is green and the CEO signs off SHIP. A CEO HOLD gets one fix round on its `must_fix` items (build.js `mode: "fixup"`), then a second sign-off; still HOLD = stop and report.
 - **Ship** = commit on the run branch, in small commits. Push the branch only when `ship.auto_push` is true. Never merge into the base branch, never open a pull request, never post anywhere: those wait for the owner.
