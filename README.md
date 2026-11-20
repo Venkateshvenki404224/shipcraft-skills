@@ -68,7 +68,7 @@ Set up the /work skill from my shipcraft plugin in this repo, then use it.
    {"extraKnownMarketplaces": {"shipcraft": {"source": {"source": "github", "repo": "Venkateshvenki404224/shipcraft-skills"}}},
     "enabledPlugins": {"shipcraft@shipcraft": true}}
    For this session, clone https://github.com/Venkateshvenki404224/shipcraft-skills to /tmp/shipcraft, read /tmp/shipcraft/skills/work/SKILL.md, and follow it exactly. S = /tmp/shipcraft/skills/work. Don't commit the settings change unless I say so.
-2. Run the first-time setup (references/setup.md): read the repo's CI, scripts and docs, draft .claude/work.json, run the check commands once, and show me the profile as a table to confirm. Don't guess values; mark anything you inferred.
+2. Run the first-time setup (references/setup.md): read the repo's CI, scripts and docs, draft the profile (.claude/work.json by default), ask me which models to use, run the check commands once, and show me the profile as a table to confirm. Don't guess values; mark anything you inferred.
 3. This is a cloud session, so I can't open localhost. Make the run board as a snapshot (scripts/board/wfboard.py --snapshot .agent/board.html), publish it with the Artifact tool, give me the link, and republish it at H1, after QA and at H2. Print the stage table (scripts/state.py show) at each gate.
 4. Before writing or editing any workflow script, load the workflow-authoring skill.
 5. Then run: /work <describe the feature, or the issue number>
@@ -138,7 +138,8 @@ The three agents expect a Frappe bench. `frappe-tester` runs
 
 `work` needs Python 3, git, and the Workflow tool in Claude Code (without it,
 the skill runs the same stages with plain subagents). On first use in a
-repository it writes `.claude/work.json`, the project profile: gate commands,
+repository it writes the project profile (`.claude/work.json` by default; it asks where to
+save it when there is no `.claude/`): the models you pick for each role, gate commands,
 app URL, roles, saved logins. It reads them from your CI config, scripts and
 docs, and asks you to confirm. The UI before/after layer needs Playwright; the
 QA videos need [agent-browser](https://www.npmjs.com/package/agent-browser)
