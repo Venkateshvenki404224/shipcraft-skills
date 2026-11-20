@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 PHASES = ["Intake", "Plan", "Tests first", "Implement", "Gate + E2E", "Verify", "Agent QA", "UI + video", "Ship"]
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
@@ -148,7 +149,7 @@ def main():
         skip = (NO_APP if a.no_app else set()) | {k for m_ in off for k in TEAM.get(m_, set())}
         steps = [{"key": k, "num": k, "phase": ph, "title": t, "who": who, "deps": deps, "artifacts": [],
                   "status": "SKIP" if k in skip else "TODO"} for k, ph, t, who, deps in STAGES]
-        m = {"run": a.run, "name": a.name, "phases": PHASES, "steps": steps, "finished": False,
+        m = {"run": a.run, "name": a.name, "phases": PHASES, "steps": steps, "finished": False, "started_at": time.time(),
              "artifacts": [".agent/issue.md"]}
         if a.session:
             m["session"] = a.session
@@ -194,6 +195,7 @@ def main():
         print(f"workflow {a.kind}: {a.run_id}")
     elif a.cmd == "finish":
         m["finished"] = True
+        m["finished_at"] = time.time()
         for s in m["steps"]:
             if s.get("status") == "RUN":
                 s["status"] = "STOPPED"

@@ -109,7 +109,7 @@ def parse_agent(path):
     if hit and hit[0] == sig:
         return hit[1]
     info = {"model": None, "first": None, "last": None, "cost": 0.0,
-            "tokens_out": 0, "tokens_in": 0, "events": [], "prompt": None}
+            "tokens_out": 0, "tokens_in": 0, "events": [], "prompt": None, "series": []}
     seen_req = set()
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -145,7 +145,9 @@ def parse_agent(path):
                     inp = u.get("input_tokens", 0) or 0
                     out = u.get("output_tokens", 0) or 0
                     cr = u.get("cache_read_input_tokens", 0) or 0
-                    info["cost"] += (inp * p[0] + out * p[1] + w5 * p[2] + w1 * p[3] + cr * p[4]) / 1e6
+                    c = (inp * p[0] + out * p[1] + w5 * p[2] + w1 * p[3] + cr * p[4]) / 1e6
+                    info["cost"] += c
+                    info["series"].append((t, c, short_model(info["model"])))
                     info["tokens_out"] += out
                     info["tokens_in"] += inp + w5 + w1 + cr
                 for b in msg.get("content") or []:
@@ -816,6 +818,11 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     spath = next((p for d in project_dirs for p in [os.path.join(d, f"{sess}.jsonl")] if os.path.isfile(p)), None) if sess else None
     if spath:
         info = parse_agent(spath)
+        t0 = m.get("started_at") or first
+        t1 = m.get("finished_at") or (None if not finished else last)
+        win = [c for (t, c, _m) in info["series"] if t and (t0 is None or t >= t0 - 60) and (t1 is None or t <= t1 + 60)]
+        main_cost = round(sum(win), 4) if t0 else info["cost"]
+        info = dict(info, cost=main_cost)
         total_cost += info["cost"]
         groups.insert(0, {"id": "Orchestrator/main", "phase": m.get("phases", ["Orchestrator"])[0], "key": "main",
                           "agents": [{"id": f"session-{sess[:8]}", "label": "orchestrator", "step": "main",
@@ -843,6 +850,7 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     return {"id": run_id, "name": m.get("name") or m.get("run") or run_id, "state": state, "events": [],
             "phases": cols, "groups": groups, "artifacts": arts, "agents": n_agents, "running": n_running,
             "app": app_info(root, now),
+            "main_cost": round(info["cost"], 4) if spath else 0.0,
             "problem": problem,
             "ui": export_ui(root, base, run_id),
             "videos": export_video(root, base, run_id),
@@ -889,7 +897,16 @@ def export_once(project_dirs, pipeline_globs):
         for r in runs:
             r.pop("_prompt_head", None)
             r.pop("_args_run", None)
-        state = {"generated": now, "project": project_dirs, "runs": runs}
+        sessions = []
+        for d in project_dirs:
+            for sp in glob.glob(os.path.join(d, "*.jsonl")):
+                si = parse_agent(sp)
+                if si["cost"]:
+                    by = {}
+                    for (_t, c, mdl) in si["series"]:
+                        by[mdl] = round(by.get(mdl, 0) + c, 4)
+                    sessions.append({"id": os.path.basename(sp)[:-6], "cost": round(si["cost"], 4), "first": si["first"], "last": si["last"], "by_model": by})
+        state = {"generated": now, "project": project_dirs, "runs": runs, "sessions": sessions}
     except Exception as e:
         state = {"generated": now, "error": str(e), "runs": []}
     write(os.path.join(OUT, "state.json"), json.dumps(state))
