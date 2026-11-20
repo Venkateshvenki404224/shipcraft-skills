@@ -90,7 +90,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
 2. **Prepare the media layers** (`references/media.md`): when `ui` is true, put the ui-snap tool in place and build the `uiSnap` command. Check `command -v agent-browser ffmpeg`; when either is missing, or the profile says `"video": false`, video is off and the evidence says why.
 3. **Write the files.** Load `workflow-authoring`. Copy `$S/workflows/build.js` to `.agent/workflow/build.js`, and write `build.args.json` with:
    - `run`, `today`, `skill` (absolute `$S`), `profile` (parsed), `profilePath`;
-   - `tickets` (verbatim from tickets.json), `roles`, `risk`, `ui`;
+   - `tickets` (verbatim from tickets.json), `testPlan` (verbatim from test-plan.json; build.js checks that every frontend and ui ticket has an end-to-end case), `roles`, `risk`, `ui`;
    - `e2e`: the profile's `e2e.cmd` with `{specs}` replaced by the plan's specs;
    - `uiSnap` (ui runs), `video`;
    - `budgets: {build: 2, qa: 1}`.
