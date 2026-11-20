@@ -28,6 +28,7 @@ You are the orchestrator. You do not write feature code yourself. You:
 | `/work approve [changes…]` | Owner gate H1 passed → build. With text: one re-plan applying it, then build |
 | `/work ship` · `/work fix then ship: <themes>` | Owner gate H2 → ship (§6), or one more fix round, then ship |
 | `/work status` | Print the stage table (`state.py show`), the board link, and what waits on whom |
+| `/work resume` | A workflow stopped (network drop, API error, closed laptop): continue it from where it stopped (§ Recovery) |
 | `/work board` | Start the board again (or republish the snapshot) and give the link |
 
 Do not post to GitHub issues or add CI workflows unless the owner asks. Reading an issue with `gh issue view` is fine.
@@ -66,7 +67,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    ```
 
    Pass the date from your context; scripts cannot read the clock.
-3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. The workflow shows on the board on its own while it runs.
+3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. Record the run id the tool returns at once: `python3 $S/scripts/state.py workflow plan <runId> --script .agent/workflow/plan.js --args-file .agent/workflow/plan.args.json`. The workflow shows on the board on its own while it runs.
 
 The workflow runs the agent team (`references/team.md`):
 1. **Research** in parallel (one reader per area, plus outside facts).
@@ -96,7 +97,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
    - `budgets: {build: 2, qa: 1}`.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
-4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
+4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`, and record its run id: `python3 $S/scripts/state.py workflow build <runId> --script .agent/workflow/build.js --args-file .agent/workflow/build.args.json`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
 5. **When the Workflow tool is missing** (a headless run), run the same stages with the Agent tool, in the order and with the prompts in `references/stages.md`, and record each stage as it finishes so the board stays current.
 
 ## 4. Media layers
@@ -142,6 +143,16 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
 
    End the commit message with the attribution lines the session gives you.
 4. Run `state.py step ship --status DONE` and `state.py finish`. Refresh the board one last time. If the run came from an issue, offer to comment the link on it. Do not comment unasked.
+
+## Recovery: `/work resume`
+
+A single agent that dies (a network drop, an API error) is retried by the workflow up to 3 times, and the board says "Recovered". When the whole workflow stops, the board says "Stopped" or "Stalled" (no agent has written anything for 15 minutes) with the reason. Then:
+
+1. Read the recorded run: `python3 $S/scripts/state.py show` prints `workflow plan|build: <runId> (<script>)`.
+2. If that run is still listed as running in this session, stop it first (TaskStop), so two copies do not edit the same files.
+3. Resume it in this session: `Workflow({scriptPath: <script>, resumeFromRunId: <runId>, args: <the JSON in its args file>})`. Every agent that finished returns its cached result at once; only the failed and unstarted ones run again. Record the new run id with `state.py workflow`.
+4. A resume works only in the session that started the run. If that session is gone, start the same workflow again with the same args file and say in the evidence that it ran twice. Check `git status` first: files the first run already changed stay, and the agents build on them.
+5. Tell the owner, in one sentence, what stopped, what you resumed and what runs next.
 
 ## Unattended runs (`"autonomy": "agents"`)
 
