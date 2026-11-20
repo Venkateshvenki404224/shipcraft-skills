@@ -35,8 +35,6 @@ const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
 const AUTO = P.autonomy === 'agents'
-// Models come only from the profile (no defaults in this script). Setup detects the host (Claude, Codex, Copilot...),
-// lists the models it offers and writes models + model_fallback into the profile. A role with no model uses model_fallback.
 const M = P.models || {}
 const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))

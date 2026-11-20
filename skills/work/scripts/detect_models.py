@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Detect which agent host runs /work and which models it offers, so setup can
-write real defaults into the profile instead of shipping hardcoded ones.
-
-  python3 detect_models.py            -> JSON on stdout
-
-Hosts: Claude Code (terminal, VS Code/Cursor extension, desktop app), Codex
-(terminal, VS Code extension), Copilot CLI (terminal, `gh copilot`; its catalog is read over `copilot --acp`). Each host
-is found on PATH first, then inside the app or editor extension that bundles it.
-
-Output: {"host": "claude|codex|copilot|unknown", "hosts_found": [...],
-         "by_host": {name: {"binary", "models", "configured", "source"}},
-         "models": [...], "configured": "...", "source": "...", "note": "..."}
-`host`, `models`, `configured` and `source` describe the running host; `by_host`
-has every host found, so setup can offer a choice when the host is unknown.
-
-It reads only: environment variables, `--help` or `debug models` output, and the
-host's own config or model cache. It never calls a model and never prints credentials.
-"""
 import glob, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
@@ -34,7 +16,6 @@ def run(cmd, timeout=20):
 
 
 def newest(patterns):
-    """Newest executable file matching any glob (by version-ish sort of the path)."""
     hits = []
     for pat in patterns:
         hits += [p for p in glob.glob(pat) if os.path.isfile(p) and os.access(p, os.X_OK)]
@@ -76,7 +57,6 @@ def claude():
     b = find_claude()
     models, configured, src = [], None, "none"
     if b:
-        # the --model help names the aliases this build supports, e.g. 'fable', 'opus', 'sonnet'
         text = re.sub(r"\s+", " ", run([b, "--help"]))
         m = re.search(r"--model <model>(.*?)(?= -\w, --| --[a-z])", text)
         models = list(dict.fromkeys(re.findall(r"'([a-z][a-z0-9.\-]*)'", m.group(1) if m else "")))
@@ -93,7 +73,7 @@ def codex():
     b = find_codex()
     home = Path(os.environ.get("CODEX_HOME", HOME / ".codex"))
     models, configured, src = [], None, "none"
-    if b:  # the real catalog for the signed-in account
+    if b:
         try:
             d = json.loads(run([b, "debug", "models"], 30))
             models = [m.get("slug") for m in d.get("models", []) if m.get("slug")]
@@ -116,8 +96,6 @@ def codex():
 
 
 def acp_models(cmd, timeout=30):
-    """Ask `copilot --acp` (Agent Client Protocol, JSON-RPC over stdio) for its catalog. session/new returns
-    models.availableModels for the signed-in account; no prompt is sent, so no model is called."""
     import select, time
     try:
         p = subprocess.Popen(cmd + ["--acp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, cwd="/tmp")
@@ -169,7 +147,7 @@ def copilot():
     if cmd:
         models = acp_models(cmd)
         src = "%s --acp (session/new availableModels)" % " ".join(cmd[:2])
-        if not models and "--model" in run(cmd + ["--help"]):  # older build without ACP: 'auto' is documented
+        if not models and "--model" in run(cmd + ["--help"]):
             models, src = ["auto"], "%s --help ('auto' only; /model is interactive)" % " ".join(cmd[:2])
     return (cmd[0] if cmd else None), models, configured, src
 
@@ -182,7 +160,6 @@ def main():
         if b:
             by_host[name] = {"binary": b, "models": models, "configured": configured, "source": src}
     found = list(by_host)
-    # the running host: only trust variables that name it unambiguously
     if env.get("CLAUDECODE") or env.get("CLAUDE_CODE_ENTRYPOINT"):
         host = "claude"
     elif env.get("CODEX_THREAD_ID") or env.get("CODEX_SANDBOX") or env.get("CODEX_MANAGED_BY_NPM"):
