@@ -12,7 +12,7 @@ One run per checkout. The folder is never committed: add `.agent/` to `.git/info
   plan.md             architect: plan, request→ticket map, test contract, risk, expected visible changes, ≤4 questions
   pm.md               PM: a decision and a reason for every open question and developer issue
   tickets.json        [{id, title, kind: test|impl|docs, role: test|backend|frontend|ui|data|docs, files, deps, acceptance, model}]
-  test-plan.json      unit/script + end-to-end cases with ids, roles, browsers, ticket
+  test-plan.json      {cases: [{id, kind: unit|e2e|property|eval, title, role, browsers, covers: [ticket ids]}]}
   workflow/           this run's workflow files: plan.js, build.js and their *.args.json (what actually ran)
   qa/<role>.json      agent QA findings per role; qa/<role>/*.png screenshots
   video/              demo-<role>.webm, qa-<role>.webm, *.contact-sheet.png   (agent-browser record)

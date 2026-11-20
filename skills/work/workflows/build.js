@@ -50,6 +50,10 @@ const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const FEATURE_MAP = P.feature_map || ''
+const CASES = (A.testPlan && Array.isArray(A.testPlan.cases)) ? A.testPlan.cases : null
+const UI_TICKETS = T.filter((t) => t.kind !== 'test' && (t.role === 'frontend' || t.role === 'ui'))
+const E2E_COVERED = new Set((CASES || []).filter((c) => c.kind === 'e2e').flatMap((c) => c.covers || []))
+const UNCOVERED_UI = CASES ? UI_TICKETS.filter((t) => !E2E_COVERED.has(t.id)).map((t) => t.id) : []
 const EVALS = P.evals && P.evals.cmd ? { cmd: P.evals.cmd, paths: P.evals.paths || [] } : null
 const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
@@ -217,6 +221,13 @@ if (A.mode === 'fixup') {
 } else {
   // ------------------------------------------------ Tests first
   phase('Tests first')
+  if (!CASES && UI_TICKETS.length) log('no testPlan in args: the UI-test coverage check did not run')
+  if (UNCOVERED_UI.length) {
+    log(`UI tickets with no end-to-end case: ${UNCOVERED_UI.join(', ')}; the tester adds them first`)
+    result.uiCoverage = await run(`These UI tickets of ${NAME} run ${A.run} have no end-to-end case in .agent/test-plan.json: ${UNCOVERED_UI.join(', ')}.
+For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket id>"] that drives the real UI as a user would (find the screen, act, see the result), using only hooks from the test contract in .agent/plan.md (add a hook to the contract when one is missing, and say so). Then write those tests. No product code. ${RULES}`,
+      { label: 'Tester: end-to-end cases for UI tickets', phase: 'Tests first', schema: DONE, model: W })
+  }
   result.tickets.push(...await runTickets(T.filter((t) => t.kind === 'test'), 'Tests first'))
   const redPrompt = `Red run for ${NAME} run ${A.run}: the feature is not implemented yet, so the new tests must FAIL, each for the right reason
 (the missing feature, not a typo, a bad locator or a broken fixture). Run the new unit/script checks${E2E ? ` and: ${E2E}` : ''}
