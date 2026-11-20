@@ -43,7 +43,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
 
    Add `.agent/` to `.git/info/exclude` (create the line once) so the run state can never be staged.
-4. **Branch.** Create `<branch_prefix><n>-<slug>`, or `<branch_prefix>local-<slug>` without an issue, from the profile's `base` (default `main`) in the current checkout. Do not use a worktree when the local app serves this checkout.
+4. **Branch.** Create `<branch_prefix><n>-<slug>`, or `<branch_prefix>local-<slug>` without an issue, from the profile's `base` (default `main`) in the current checkout, after `git fetch origin <base>`, starting from `origin/<base>` and never from whatever branch happens to be checked out. Do not use a worktree when the local app serves this checkout.
 5. **Manifest.** Run:
 
    ```
@@ -137,7 +137,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - Nothing from the profile's `secrets`, `.agent/`, the ui-snap copy, `test-results/` or `node_modules/` is in the diff.
    - If `ui`: `.agent/ui/review.json` exists and is newer than `.agent/ui/shots.json`.
 3. Land it by the profile's `ship.mode`:
-   - `pr` (default): commit on the branch with a feature-level message, then ask once before `git push -u origin <branch>` and `gh pr create` (title from the request; body from the evidence summary, without `.agent/` paths).
+   - `pr` (default): run `python3 $S/scripts/branch_guard.py --base <base>` first; on `stale`, run it with `--new <a new branch name>` so the commit never lands on a merged or closed branch. Then commit on the branch with a feature-level message, then ask once before `git push -u origin <branch>` and `gh pr create` (title from the request; body from the evidence summary, without `.agent/` paths).
    - `squash`: `git checkout <base> && git merge --squash <branch>`, commit with a feature-level message, then ask once before `git push origin <base>`.
 
    End the commit message with the attribution lines the session gives you.
@@ -154,6 +154,7 @@ Only when the profile says `"autonomy": "agents"`. Setup asks this on first use 
 
 ## Rules that always apply
 
+- **No commit on a stale branch.** Before every commit (setup, ship, a fix round the owner asks for), run `python3 $S/scripts/branch_guard.py --base <base>`. `stale` means the current branch is the base, or its pull request is merged or closed, or all its commits are already in the base: run it with `--new <name>` and commit there. The one exception is `ship.mode: squash`, which commits on the base by design.
 - **Owner gates are never skipped** in the default `"autonomy": "owner"`. Nothing is pushed without the owner's yes; with `"agents"`, only the run branch, and only with `ship.auto_push`.
 - **The board and the table stay current.** Every stage you start or finish goes through `state.py`; in a cloud session, republish the snapshot at H1, after QA and at H2.
 - **The team.** Agents are labelled "<Role>: <task>" (PM, CEO, Architect, UI/UX designer, Senior dev, Backend dev, Frontend dev, UI dev, Tester, Verifier, QA, Fixer), so the board shows who did what. Every agent call is retried up to 3 times when it returns nothing. `references/team.md` has each role's job and output.
