@@ -41,6 +41,7 @@ const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))
 if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
 const W = M.work || FB
+const CHEAP = M.cheap || W
 const APPROVE_M = M.approve || FB, PLAN_M = M.plan || FB
 const VERIFY_M = M.verify || APPROVE_M
 const PM_M = M.pm || PLAN_M, CEO_M = M.ceo || PLAN_M, DESIGN_M = M.design || PLAN_M
@@ -161,7 +162,7 @@ Browsers expected: ${BROWSERS.join(', ')}. Per browser report PASS n/n, FAIL, or
 If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.${EVALS ? `
 AI evals: list the changed files (git diff --name-only HEAD plus untracked files). ${EVALS.paths.length ? `If any of them is under ${EVALS.paths.join(', ')}` : 'Always'}, run: ${EVALS.cmd}
 Report it as a check named "eval" with its scores; a failing or regressed eval is a failure and makes green false. When no matching file changed, report the check as "eval" with result "SKIP (no AI files changed)".` : ''}`,
-  { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: W, effort: 'low' })
+  { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: CHEAP, effort: 'low' })
 
 const fix = (label, phaseName, what) => run(
   `Fix round for ${NAME} run ${A.run}. Read .agent/plan.md. Fix these problems in the product code:
@@ -174,7 +175,7 @@ const snapCmd = (ph) => (A.uiSnap || '').split('{phase}').join(ph)
 const uiAfter = async (tag) => {
   const cap = await run(`Run the UI after capture: ${snapCmd('after')}
 Report the counts printed by the teardown and any test that errored (an error is not a visual change). Do not change files.`,
-    { label: `UI snap: after${tag}`, phase: 'UI after', model: W, effort: 'low' })
+    { label: `UI snap: after${tag}`, phase: 'UI after', model: CHEAP, effort: 'low' })
   const designer = DESIGN_ON && A.ui
   const rev = await run(
     `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${FEATURE_MAP ? `, the screen names in ${FEATURE_MAP}` : ''}${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
@@ -232,12 +233,12 @@ For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket i
   const redPrompt = `Red run for ${NAME} run ${A.run}: the feature is not implemented yet, so the new tests must FAIL, each for the right reason
 (the missing feature, not a typo, a bad locator or a broken fixture). Run the new unit/script checks${E2E ? ` and: ${E2E}` : ''}
 (no retries; keep timeouts short). Compare each failure message with .agent/test-plan.json. Do not change files.`
-  let red = await run(redPrompt, { label: 'Gate: red run', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
+  let red = await run(redPrompt, { label: 'Gate: red run', phase: 'Tests first', schema: RED, model: CHEAP, effort: 'low' })
   if (red && (red.passing_unexpectedly.length || red.wrong_reason.length)) {
     log(`red run: ${red.passing_unexpectedly.length} pass too early, ${red.wrong_reason.length} fail for the wrong reason; fixing the tests once`)
     await run(`Fix these tests so they fail only because the feature is missing (no product code): ${JSON.stringify({ passing: red.passing_unexpectedly, wrong: red.wrong_reason })}. ${RULES}`,
       { label: 'Tester: fix the red run', phase: 'Tests first', schema: DONE, model: W })
-    red = await run(redPrompt, { label: 'Gate: red run 2', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
+    red = await run(redPrompt, { label: 'Gate: red run 2', phase: 'Tests first', schema: RED, model: CHEAP, effort: 'low' })
   }
   result.red = red
 
@@ -247,7 +248,7 @@ For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket i
     result.uiBefore = await run(`Run the UI before capture on the current code, before anything is implemented:
 ${snapCmd('before')}
 It reads .agent/ui/pages.json. Report the shot count and any errors. Do not change files.`,
-      { label: 'UI snap: before', phase: 'UI before', model: W, effort: 'low' })
+      { label: 'UI snap: before', phase: 'UI before', model: CHEAP, effort: 'low' })
   }
 
   // ------------------------------------------------ Implement

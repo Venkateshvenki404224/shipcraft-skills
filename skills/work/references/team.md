@@ -19,7 +19,7 @@ A /work run is staffed like a small product company. Each agent has one job, wri
 | **Frontend dev** | Implement | ticket `model` | plan, `design.md` | pages, components | builds to the design; reuses the project's components; escapes output; test hooks; every state |
 | **UI dev** | Implement | ticket `model` | `design.md` | styles, layout, copy | the design exactly: spacing, copy, states, 390 px, dark mode, focus, screen-reader labels; no new UI library |
 | **Data dev**, **Tech writer** | Implement | ticket `model` | plan | migrations and fixtures; docs | reversible migrations, removable test data; docs for the named reader |
-| Gate, **Fixer** | Gate + E2E, Fix | `work` | gate output, findings | product files | runs the gate; fixes without weakening tests |
+| Gate, **Fixer** | Gate + E2E, Fix | Gate: `cheap` (else `work`); Fixer: `work` | gate output, findings | product files | runs the gate; fixes without weakening tests |
 | **Verifier** (diff) | Verify | `verify` (low risk: `work`) | the diff, review rules | (findings) | one lens, or three at high risk: correctness, security and roles, UI rules |
 | **QA: `<role>`** | Agent QA | `work` | plan, `prd.md`, test plan | `.agent/qa/<role>.json`, videos | explores as that role from where the role really starts; finds the feature the way a user would |
 | **UI/UX designer** (shots) | UI after | `design` | before/after shots, `design.md` | `.agent/ui/review.json` | expected / unexpected / broken per changed shot, plus "does not match the design" |

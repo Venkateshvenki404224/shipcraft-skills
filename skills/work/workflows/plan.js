@@ -31,7 +31,7 @@ const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || 
 if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
 const PLAN_M = M.plan || FB, APPROVE_M = M.approve || FB
 const MODELS = {
-  scope: M.research || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
+  scope: M.cheap || M.research || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
   verify: M.verify || APPROVE_M, pm: M.pm || PLAN_M, ceo: M.ceo || PLAN_M,
   design: M.design || PLAN_M, senior: M.senior || APPROVE_M,
 }
