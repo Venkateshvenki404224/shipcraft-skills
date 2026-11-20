@@ -42,6 +42,6 @@
   "available_models": ["<written by scripts/detect_models.py>"],
   "model_fallback": "<one of available_models: used by any role with no model>",
   "models": { "plan": "<model>", "approve": "<model>", "research": "<model>", "work": "<model>",
-              "pm": "<model, optional>", "ceo": "<optional>", "design": "<optional>", "senior": "<optional>", "verify": "<optional>" },
+              "pm": "<model, optional>", "ceo": "<optional>", "design": "<optional>", "senior": "<optional>", "verify": "<optional>", "cheap": "<optional: gate runs, red runs, UI snaps, scope>" },
   "ship": { "mode": "pr", "auto_push": false }
 }
