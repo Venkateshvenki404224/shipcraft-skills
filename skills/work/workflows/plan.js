@@ -43,6 +43,8 @@ const STACK = TEAM.stack || P.stack || ''
 const SENIORS = TEAM.senior === false ? [] : (Array.isArray(TEAM.senior) && TEAM.senior.length ? TEAM.senior : ['Senior dev', ...(STACK ? [`Senior ${STACK} dev`] : [])])
 const BUSINESS = TEAM.business ? `\nWhat the business sells and to whom (from the profile): ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
+const FEATURE_MAP = P.feature_map || ''
+const FMAP = FEATURE_MAP ? ` and the feature map ${FEATURE_MAP} (the names of every screen, panel and action, from the user's point of view: use those names, never invent new ones)` : ''
 const MAX_REVISIONS = 2
 
 // ---------------------------------------------------------------- helpers
@@ -153,7 +155,7 @@ phase('Plan')
 const productFiles = [PM_ON && '.agent/prd.md', CEO_ON && '.agent/ceo.md'].filter(Boolean)
 const planPrompt = (extra) => `You are the architect for ${NAME} run ${A.run} (${A.title || ''}), today ${A.today || ''}.
 Read ${ISSUE}, ${productFiles.length ? `${productFiles.join(', ')} (the product brief and the CEO's scope: honour the cuts and must-haves), ` : ''}${SKILL}/references/pipeline.md (sections "Plan check", "Test rules", "UI before / after"), the project rules (${RULES}),
-the project profile (${A.profilePath || '.work-profile/work.json'}), and these research reports:
+the project profile (${A.profilePath || '.work-profile/work.json'})${FMAP}, and these research reports:
 ${JSON.stringify(research)}
 
 Write these files (create .agent/ui/ only if ui):
@@ -162,7 +164,8 @@ Write these files (create .agent/ui/ only if ui):
 - .agent/tickets.json: [{"id":"T1","title":"...","kind":"test|impl|docs","role":"test|backend|frontend|ui|data|docs","files":["..."],"deps":["T0"],"acceptance":["Given/When/Then"],"model":"${M.work || FB}"}]. "role" says which developer builds it: backend (server code, APIs, jobs, permissions), frontend (pages, components, client code), ui (styles, layout, copy, design-system work), data (migrations, fixtures, seed data), docs, test. Test tickets come first and depend on nothing but fixtures. Tickets that share a file must depend on each other.
 - .agent/test-plan.json: unit/script checks and end-to-end cases with ids, role, browser list (from the profile's e2e.browsers), and which ticket each covers; include cross-page state cases for anything that navigates and skip cases for role-gated steps.
 - .agent/ui/pages.json (only if ui): pages, roles, viewports, themes, hide/mask, in the format at the top of ${SKILL}/scripts/ui-snap/spec.ts.${P.ui_snap && P.ui_snap.theme_key ? ` Set "theme_key": "${P.ui_snap.theme_key}".` : ''}${P.ui_snap && P.ui_snap.hide && P.ui_snap.hide.length ? ` Default "hide": ${JSON.stringify(P.ui_snap.hide)}.` : ''}
-Return "specs": the test files or folder of this feature, as they go into the profile's e2e command.
+${FEATURE_MAP ? `When the feature adds, renames or removes a screen, panel or action, add a docs ticket that updates ${FEATURE_MAP} in the same shape (name, where it lives, how a user reaches it, which roles see it).
+` : ''}Return "specs": the test files or folder of this feature, as they go into the profile's e2e command.
 Do not write product code.${extra || ''}`
 let plan = await run(planPrompt(), { label: 'Architect: plan', phase: 'Plan', schema: PLAN, model: MODELS.plan })
 if (!plan) throw new Error('architect returned nothing')
@@ -170,7 +173,7 @@ if (!plan) throw new Error('architect returned nothing')
 // ---------------------------------------------------------------- Design (UI runs)
 if (DESIGN_ON && plan.ui) {
   phase('Design')
-  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${RULES})${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
+  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${RULES})${FMAP}${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
 Look at the pages the feature changes as they are today (read their templates or components; open them in a browser if the app runs${HAS_APP ? ` at ${P.app.url}` : ''}).
 Write .agent/ui/design.md, one section per page or component:
 - layout and hierarchy: what the user sees first, and the one main action;
@@ -242,7 +245,8 @@ const checklist = `1. Every sentence of the request${PM_ON ? ' and every accepta
 5. Tickets touching the same file depend on each other; test tickets come before implementation; each ticket has a role.
 6. The risk tier fits (shared layout, auth, session, payment or data-migration code is at least medium).
 7. Nothing breaks the project rules in ${RULES}${P.review_rules ? ` or the BLOCKING rules in ${P.review_rules}` : ''}${CEO_ON ? ', the CEO\'s cuts and must-haves in .agent/ceo.md, or its never_claim list' : ''}.
-${plan.ui ? `8. pages.json covers every page in "expected visible changes", for the affected roles${DESIGN_ON ? '; every state in .agent/ui/design.md has a test or a screenshot' : ''}.` : '8. ui=false really means no user-visible change.'}`
+${plan.ui ? `8. pages.json covers every page in "expected visible changes", for the affected roles${DESIGN_ON ? '; every state in .agent/ui/design.md has a test or a screenshot' : ''}.` : '8. ui=false really means no user-visible change.'}${FEATURE_MAP ? `
+9. Screens and actions use the names in ${FEATURE_MAP}; a new or changed screen has a ticket that updates it.` : ''}`
 const files = [ISSUE, ...productFiles, '.agent/plan.md', '.agent/tickets.json', '.agent/test-plan.json', ...(plan.ui ? ['.agent/ui/pages.json'] : []), ...(plan.ui && DESIGN_ON ? ['.agent/ui/design.md'] : []), ...(PM_ON ? ['.agent/pm.md'] : [])]
 let approval = null, verifier = null
 for (let round = 0; round <= MAX_REVISIONS; round++) {
