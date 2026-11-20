@@ -35,14 +35,16 @@ const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
 const AUTO = P.autonomy === 'agents'
-// Models come only from the profile's "models" (no defaults here). The orchestrator asks the owner for them
-// during setup, so a missing key is an error, not a silent fallback.
+// Models come only from the profile (no defaults in this script). Setup detects the host (Claude, Codex, Copilot...),
+// lists the models it offers and writes models + model_fallback into the profile. A role with no model uses model_fallback.
 const M = P.models || {}
-const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !M[k])
-if (MISSING.length) throw new Error(`profile.models is missing: ${MISSING.join(', ')}. Ask the owner for them (references/setup.md, "Models") and pass the profile again.`)
-const W = M.work
-const VERIFY_M = M.verify || M.approve
-const PM_M = M.pm || M.plan, CEO_M = M.ceo || M.plan, DESIGN_M = M.design || M.plan
+const FB = P.model_fallback
+const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))
+if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
+const W = M.work || FB
+const APPROVE_M = M.approve || FB, PLAN_M = M.plan || FB
+const VERIFY_M = M.verify || APPROVE_M
+const PM_M = M.pm || PLAN_M, CEO_M = M.ceo || PLAN_M, DESIGN_M = M.design || PLAN_M
 const TEAM = P.team === false ? { pm: false, ceo: false, design: false } : (P.team || {})
 const PM_ON = TEAM.pm !== false, CEO_ON = TEAM.ceo !== false, DESIGN_ON = TEAM.design !== false
 const STACK = TEAM.stack || P.stack || ''
@@ -174,7 +176,7 @@ unreadable text, an empty state where data belongs, wrong data for the role${des
 against the project's access rules (${REVIEW_RULES}). Write .agent/ui/review.json:
 {"verdict":"PASS|CHANGES","summary":"one line","shots":{"<id>":{"verdict":"expected|unexpected|broken","note":"..."}}}
 verdict is PASS only if nothing is unexpected or broken. Return the same verdict, summary, counts per verdict and the flagged shots.`,
-    { label: `${designer ? 'UI/UX designer' : 'UI reviewer'}: shots${tag}`, phase: 'UI after', schema: UIREV, model: designer ? DESIGN_M : (RISK === 'high' ? M.approve : W) })
+    { label: `${designer ? 'UI/UX designer' : 'UI reviewer'}: shots${tag}`, phase: 'UI after', schema: UIREV, model: designer ? DESIGN_M : (RISK === 'high' ? APPROVE_M : W) })
   return { capture: cap, review: rev }
 }
 
