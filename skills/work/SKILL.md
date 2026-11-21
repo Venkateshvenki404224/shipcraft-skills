@@ -161,8 +161,8 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
 
 | Template | Models | Plan |
 |---|---|---|
-| `lean` | Sonnet plans, builds and reviews; Haiku for PM, CEO, designer, research, gate runs | up to 3 researchers and 1 outside question; small issues skip the CEO design review and the senior devs; 1 revision round; low effort for research, PM and CEO, medium for the rest |
-| `balanced` (default) | Opus for architect, approver, senior devs, verifiers; Sonnet builds; Haiku researches | up to 4 researchers, 2 outside questions; one senior dev unless the issue is large; CEO design review except on small issues; 2 revision rounds |
+| `lean` | Sonnet plans and builds; Opus for the guardrails (PM, CEO, verifiers), which decide scope and sign-off; Haiku for designer, research, gate runs | up to 3 researchers and 1 outside question; small issues skip the CEO design review and the senior devs; 1 revision round; low effort for research, medium for the rest |
+| `balanced` (default) | Opus for architect, approver, senior devs, verifiers, PM and CEO; Sonnet builds; Haiku researches | up to 4 researchers, 2 outside questions; one senior dev unless the issue is large; CEO design review except on small issues; 2 revision rounds |
 | `max` | Fable plans and approves; Opus elsewhere | up to 6 researchers, 4 outside; full team on every issue; 2 revision rounds |
 
 The scope agent rates each issue `small`, `medium` or `large`; the plan uses that with the template. `knobs` override single parts of the template: `revisions` (0–3), `areas` (1–6), `outside` (0–4), `design_review` (`on`/`off`), `seniors` (`none`/`one`/`all`), and `effort` per role (`research`, `pm`, `ceo`, `design`, `plan`, `review`, `senior`: `low`/`medium`/`high`). Report the template, the size and every knob in the evidence and on the board, so a cheap run is visibly cheap.

@@ -50,7 +50,7 @@ const TIER = ['lean', 'balanced', 'max'].includes(A.tier || P.tier) ? (A.tier ||
 const K = Object.assign({}, P.knobs || {}, A.knobs || {})
 const CAPS = Object.assign({ lean: { areas: 3, outside: 1, revisions: 1 }, balanced: { areas: 4, outside: 2, revisions: 2 }, max: { areas: 6, outside: 4, revisions: 2 } }[TIER],
   Object.fromEntries(['areas', 'outside', 'revisions'].filter((k) => Number.isInteger(K[k])).map((k) => [k, K[k]])))
-const EFFORT_BY_TIER = { lean: { research: 'low', pm: 'low', ceo: 'low', design: 'medium', plan: 'medium', review: 'medium', senior: 'medium' }, balanced: { research: 'low' }, max: {} }[TIER]
+const EFFORT_BY_TIER = { lean: { research: 'low', design: 'medium', plan: 'medium', review: 'medium', senior: 'medium' }, balanced: { research: 'low' }, max: {} }[TIER]
 const EFFORT = K.effort && typeof K.effort === 'object' ? Object.assign({}, EFFORT_BY_TIER, K.effort) : EFFORT_BY_TIER
 const eff = (role) => (EFFORT[role] ? { effort: EFFORT[role] } : {})
 const MAX_REVISIONS = CAPS.revisions
