@@ -339,7 +339,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
         <p class="h tier-note" id="tier-note"></p>
         <div id="set-models"></div></fieldset>
       <fieldset class="span2"><legend>Plan (blank = the cost template's default)</legend><div id="set-knobs" class="knobs"></div></fieldset>
-      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div></fieldset>
+      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div><legend class="sub">Ship</legend><label class="set-row" title="On: when CI is green, an approver agent merges the PR or hands it to you with a question. Migrations, protected files and security changes always come to you.">Auto-merge<input type="checkbox" id="set-merge" data-testid="set-merge"></label><p class="h" id="merge-note"></p></fieldset>
     </div>
     <p class="h">Changes apply when the next workflow starts (the plan, or the build after H1). A stage turned off is reported as skipped in the evidence.</p>
     <div class="set-actions"><span id="set-msg" class="h"></span><button value="cancel" class="btn">Close</button><button id="set-save" class="btn primary" value="default">Save</button></div>
@@ -650,6 +650,9 @@ function fillSettings() {
   $('set-tier').value = tier
   $('tier-note').textContent = TIERS[tier].note
   fillKnobs(tier, (scope === 'run' ? { ...settings.knobs.repo, ...settings.knobs.run } : settings.knobs.repo) || {})
+  const merge = (scope === 'run' && settings.merge && settings.merge.run) || (settings.merge && settings.merge.repo) || 'owner'
+  $('set-merge').checked = merge === 'auto'
+  $('merge-note').textContent = merge === 'auto' ? 'An approver merges green PRs; one-way changes still come to you.' : 'PRs wait for you to merge.'
   $('set-msg').textContent = ''
 }
 function mergeRun(repo, run) {
@@ -659,7 +662,7 @@ function mergeRun(repo, run) {
 }
 async function saveSettings(e) {
   e.preventDefault()
-  const body = { scope: $('set-scope').value, tier: $('set-tier').value, models: {}, stages: {}, team: {} }
+  const body = { scope: $('set-scope').value, tier: $('set-tier').value, merge: $('set-merge').checked ? 'auto' : 'owner', models: {}, stages: {}, team: {} }
   document.querySelectorAll('[data-model]').forEach((el) => { body.models[el.dataset.model] = el.value })
   document.querySelectorAll('[data-stage]').forEach((el) => { body.stages[el.dataset.stage] = el.checked })
   document.querySelectorAll('[data-team]').forEach((el) => { body.team[el.dataset.team] = el.checked })
