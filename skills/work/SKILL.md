@@ -35,7 +35,19 @@ You are the orchestrator. You do not write feature code yourself. You:
 | `/work resume` | A workflow stopped (network drop, API error, closed laptop): continue it from where it stopped (§ Recovery) |
 | `/work board` | Start the board again (or republish the snapshot) and give the link |
 
-Do not post to GitHub issues or add CI workflows unless the owner asks. Reading an issue with `gh issue view` is fine.
+Do not add CI workflows unless the owner asks. Reading an issue with `gh issue view` is fine.
+
+**Issue sync** (profile `issues.sync`, asked at first setup, recommended on): the issue shows where its run is, so the owner can follow everything from GitHub. Run `python3 $S/scripts/issue_sync.py stage <n> <stage>` at each point below; it keeps one `work:<stage>` label and adds a one-line comment (`issues.comments: false` keeps the labels only). With `issues.sync` off, post nothing on issues unless the owner asks.
+
+| When | Stage |
+|---|---|
+| a chain or lanes run starts, for every issue still waiting | `queued` |
+| intake (§1) | `planning` |
+| H1 passed, the build starts | `building` |
+| the PR is open (§6) | `in-review --pr <pr>`, then `issue_sync.py link <n> --pr <pr>` (adds `Closes #<n>` to the PR body) |
+| an agent hands the run to a person (NEEDS_INFO, a stopped chain, an escalated merge) | `needs-human --note "<the question>"` |
+| the usage guard pauses the run | `paused --note "resumes after <time>"` |
+| a PR merged into a branch other than the default one (a stacked PR) | `issue_sync.py closed <pr>`: GitHub closes issues only on a merge into the default branch |
 
 ## 1. Intake (inline, no agents)
 
