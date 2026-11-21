@@ -22,6 +22,23 @@ const NAME = P.project || 'the project'
 const SKILL = A.skill || '.claude/skills/work'
 const ISSUE = A.issue || '.agent/issue.md'
 const RULES = (P.rules || ['CLAUDE.md']).join(', ')
+// The result goes back into the orchestrator's context, which has to last the whole run: long strings and lists
+// are cut here. Every detail is in the .agent/ files the agents wrote (and in the workflow journal).
+const SLIM_STR = (A.slim && A.slim.chars) || 240, SLIM_LIST = (A.slim && A.slim.items) || 6
+function slim(v, depth = 0) {
+  if (A.slim === false) return v
+  if (typeof v === 'string') return v.length > SLIM_STR ? `${v.slice(0, SLIM_STR)}… (+${v.length - SLIM_STR} chars, see the .agent/ file)` : v
+  if (Array.isArray(v)) {
+    const cap = v.every((x) => typeof x === 'string' && x.length <= 120) ? 40 : SLIM_LIST
+    const kept = v.slice(0, cap).map((x) => slim(x, depth + 1))
+    return v.length > cap ? [...kept, `… +${v.length - cap} more in the .agent/ file`] : kept
+  }
+  if (v && typeof v === 'object') return depth > 4 ? '(nested; see the .agent/ file)' : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, slim(x, depth + 1)]))
+  return v
+}
+const SUMMARY_RULE = 'Every Markdown file you write under .agent/ starts with "## Summary": 3 to 5 bullets a person can skim; the detail follows.'
+const PLAN_RULES = `${RULES}; ${SUMMARY_RULE}`
+
 const ROLES = (P.roles || []).join(', ') || '(no user roles: the project has no app UI)'
 const HAS_APP = !!(P.app && P.app.url)
 const AUTO = (A.autonomy || (P.autonomy && typeof P.autonomy === 'object' ? (P.autonomy.single || 'owner') : P.autonomy)) === 'agents'
@@ -132,7 +149,7 @@ if (PM_ON || CEO_ON) phase('Product')
 if (PM_ON) {
   out.prd = await run(
     `You are the product manager for ${NAME}, run ${A.run} (${A.title || ''}), today ${A.today || ''}.${BUSINESS}
-Read ${ISSUE}, the project rules (${RULES}) and these research reports:
+Read ${ISSUE}, the project rules (${PLAN_RULES}) and these research reports:
 ${JSON.stringify(research)}
 Write .agent/prd.md, a short product brief (no design, no code):
 - the problem and who has it (the users and roles: ${ROLES});
@@ -159,7 +176,7 @@ Write .agent/ceo.md with the verdict and these lists, short. Return the same.`,
   if (out.ceo && out.ceo.verdict === 'NO_GO') {
     out.stopped = 'ceo'
     log(`CEO: NO_GO. ${out.ceo.summary}`)
-    return out
+    return slim(out)
   }
 }
 
@@ -167,7 +184,7 @@ Write .agent/ceo.md with the verdict and these lists, short. Return the same.`,
 phase('Plan')
 const productFiles = [PM_ON && '.agent/prd.md', CEO_ON && '.agent/ceo.md'].filter(Boolean)
 const planPrompt = (extra) => `You are the architect for ${NAME} run ${A.run} (${A.title || ''}), today ${A.today || ''}.
-Read ${ISSUE}, ${productFiles.length ? `${productFiles.join(', ')} (the product brief and the CEO's scope: honour the cuts and must-haves), ` : ''}${SKILL}/references/pipeline.md (sections "Plan check", "Test rules", "UI before / after"), the project rules (${RULES}),
+Read ${ISSUE}, ${productFiles.length ? `${productFiles.join(', ')} (the product brief and the CEO's scope: honour the cuts and must-haves), ` : ''}${SKILL}/references/pipeline.md (sections "Plan check", "Test rules", "UI before / after"), the project rules (${PLAN_RULES}),
 the project profile (${A.profilePath || '.work-profile/work.json'})${FMAP}, and these research reports:
 ${JSON.stringify(research)}
 
@@ -186,7 +203,7 @@ if (!plan) throw new Error('architect returned nothing')
 // ---------------------------------------------------------------- Design (UI runs)
 if (DESIGN_ON && plan.ui) {
   phase('Design')
-  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${RULES})${FMAP}${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
+  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${PLAN_RULES})${FMAP}${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
 Look at the pages the feature changes as they are today (read their templates or components; open them in a browser if the app runs${HAS_APP ? ` at ${P.app.url}` : ''}).
 Write .agent/ui/design.md, one section per page or component:
 - layout and hierarchy: what the user sees first, and the one main action;
@@ -298,4 +315,4 @@ ${JSON.stringify({ unmapped, issues })}`),
     { label: `Architect: revise r${round + 1}`, phase: 'Approve', schema: PLAN, model: MODELS.plan })) || plan
 }
 
-return { ...out, plan, approval, verifier, team: { pm: PM_ON, ceo: CEO_ON, design: DESIGN_ON && !!plan.ui, seniors: SENIOR_TEAM }, tier: TIER, size: SIZE, autonomy: AUTO ? 'agents' : 'owner' }
+return slim({ ...out, plan, approval, verifier, team: { pm: PM_ON, ceo: CEO_ON, design: DESIGN_ON && !!plan.ui, seniors: SENIOR_TEAM }, tier: TIER, size: SIZE, autonomy: AUTO ? 'agents' : 'owner' })
