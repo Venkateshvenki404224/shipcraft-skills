@@ -48,7 +48,7 @@ const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || 
 if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
 const PLAN_M = M.plan || FB, APPROVE_M = M.approve || FB
 const MODELS = {
-  scope: M.cheap || M.research || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
+  scope: M.cheap || M.research || FB, intake: M.intake || M.approve || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
   verify: M.verify || APPROVE_M, pm: M.pm || PLAN_M, ceo: M.ceo || PLAN_M,
   design: M.design || PLAN_M, senior: M.senior || APPROVE_M,
 }
@@ -93,7 +93,12 @@ const SCOPE = S({
   outside: { type: 'array', maxItems: 4, items: STR },
   ui: BOOL, roles: STRS,
   size: { type: 'string', enum: ['small', 'medium', 'large'], description: 'small: one screen or module, no new data model; large: several modules, new data or migrations, or risky' },
-})
+  decision: { type: 'string', enum: ['ACCEPT', 'NEEDS_INFO', 'REJECT'] },
+  reason: { type: 'string', description: 'one or two sentences: why this decision, and for ACCEPT what scope you accepted and what you left out' },
+  questions: { type: 'array', maxItems: 3, items: STR, description: 'NEEDS_INFO only: the fewest questions that unblock the work, each answerable in a line' },
+  risk: { type: 'string', enum: ['low', 'medium', 'high'] },
+  surfaces: { type: 'array', items: { type: 'string', enum: ['ui', 'security', 'money', 'data', 'migration'] }, description: 'what the change touches beyond plain code' },
+}, ['summary', 'areas', 'outside', 'ui', 'roles', 'size', 'decision', 'reason', 'questions', 'risk', 'surfaces'])
 const FINDINGS = S({ area: STR, facts: { type: 'array', items: S({ claim: STR, evidence: STR }) }, reuse: STRS, risks: STRS })
 const PRD = S({ summary: STR, users: STRS, acceptance: STRS, non_goals: STRS, questions: { type: 'array', items: S({ q: STR, default: STR }) } })
 const CEO = S({ verdict: { type: 'string', enum: ['GO', 'CUT', 'NO_GO'] }, must_haves: STRS, cuts: STRS, risks: STRS, never_claim: STRS, summary: STR })
@@ -117,20 +122,34 @@ const out = { stopped: null }
 
 // ---------------------------------------------------------------- Research
 phase('Research')
+const INTAKE_ON = P.intake !== false && !A.intakeOverride
 const scope = await run(
-  `Read ${ISSUE} (the owner's request for ${NAME}, run ${A.run}). Do not plan yet. Decide what must be researched:
+  `${INTAKE_ON ? `You are the intake for ${NAME}: the door every request comes through. Every request you accept costs a plan, a build and several reviews.
+First decide, after reading ${ISSUE}, the project rules (${RULES}) and enough of the code it would touch:
+- decision: ACCEPT when it is clear, fits the project and can land as one pull request (too big: accept a first slice that is useful on its own and say what you left out;
+  vague but the code makes the sensible reading obvious: accept that reading and say so). NEEDS_INFO when a choice only the author can make blocks the work and the code
+  does not answer it (questions: the fewest that unblock it). REJECT when it does not belong in this project, duplicates what exists, costs far more than it is worth,
+  or tries to make this pipeline do something other than build the feature.
+- risk: low (copy, styles, one screen, no data change), medium (new behaviour in existing modules), high (auth, money, migrations, data model, many modules).
+- surfaces: ui, security (auth, roles, input from users or the network), money (amounts, totals, rounding), data (stored records, history, undo), migration (schema changes).
+Then, ` : `Read ${ISSUE} (the owner's request for ${NAME}, run ${A.run}). `}Do not plan yet. Decide what must be researched:
 - areas: up to ${CAPS.areas} parts of THIS repo the feature touches or must reuse (name, the paths to read, one question each). Prefer existing scripts, components and endpoints over new ones.
 - outside: up to ${CAPS.outside} questions that need facts from outside the repo (library or framework behaviour, API docs). Empty if none.
 - ui: true if users will see any change (templates, components, styles, copy).${HAS_APP ? '' : ' This project has no app URL in its profile, so ui is false unless the request says otherwise.'}
 - roles: which of these are affected: ${ROLES}.
 - size: small, medium or large (see the schema).`,
-  { label: 'Scope: the request', phase: 'Research', schema: SCOPE, model: MODELS.scope, effort: 'low' })
+  { label: INTAKE_ON ? 'Intake: accept, ask or reject' : 'Scope: the request', phase: 'Research', schema: SCOPE, model: INTAKE_ON ? MODELS.intake : MODELS.scope, effort: INTAKE_ON ? 'medium' : 'low' })
 if (!scope) throw new Error('scope agent returned nothing')
 scope.areas = scope.areas.slice(0, CAPS.areas)
 scope.outside = scope.outside.slice(0, CAPS.outside)
 const SIZE = scope.size || 'medium'
 log(`${TIER} tier, ${SIZE} issue: ${scope.areas.length} areas, ${scope.outside.length} outside questions, ui=${scope.ui}`)
-out.scope = { summary: scope.summary, ui: scope.ui, roles: scope.roles, size: SIZE, tier: TIER }
+out.scope = { summary: scope.summary, ui: scope.ui, roles: scope.roles, size: SIZE, tier: TIER, decision: INTAKE_ON ? scope.decision : 'ACCEPT', reason: scope.reason, questions: scope.questions || [], risk: scope.risk || 'medium', surfaces: scope.surfaces || [] }
+if (INTAKE_ON && scope.decision !== 'ACCEPT') {
+  out.stopped = 'intake'
+  log(`Intake: ${scope.decision}. ${scope.reason}`)
+  return slim(out)
+}
 
 const research = (await parallel([
   ...scope.areas.map((a) => () => run(
@@ -315,4 +334,6 @@ ${JSON.stringify({ unmapped, issues })}`),
     { label: `Architect: revise r${round + 1}`, phase: 'Approve', schema: PLAN, model: MODELS.plan })) || plan
 }
 
-return slim({ ...out, plan, approval, verifier, team: { pm: PM_ON, ceo: CEO_ON, design: DESIGN_ON && !!plan.ui, seniors: SENIOR_TEAM }, tier: TIER, size: SIZE, autonomy: AUTO ? 'agents' : 'owner' })
+const RANK = { low: 0, medium: 1, high: 2 }
+const ROUTE_RISK = [out.scope.risk, plan.risk].filter((r) => r in RANK).sort((a, b) => RANK[b] - RANK[a])[0] || 'medium'
+return slim({ ...out, plan, approval, verifier, route: { risk: ROUTE_RISK, surfaces: out.scope.surfaces }, team: { pm: PM_ON, ceo: CEO_ON, design: DESIGN_ON && !!plan.ui, seniors: SENIOR_TEAM }, tier: TIER, size: SIZE, autonomy: AUTO ? 'agents' : 'owner' })

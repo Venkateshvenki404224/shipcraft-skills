@@ -291,14 +291,26 @@ It reads .agent/ui/pages.json. Report the shot count and any errors. Do not chan
 
   // ------------------------------------------------ Verify by risk tier
   phase('Verify')
-  const LENSES = RISK === 'high' ? ['correctness and regressions', 'security, auth and role checks', 'UI rules, accessibility, phone widths'] : ['correctness and regressions']
-  const verifyModel = RISK === 'low' ? W : VERIFY_M
-  const reviews = (await parallel(LENSES.map((lens) => () => run(
+  const LENS_TEXT = {
+    correctness: 'correctness and regressions', security: 'security, auth and role checks', ui: 'UI rules, accessibility, phone widths',
+    money: 'money: integer amounts, rounding, totals that must balance, currency formatting', data: 'data: stored records and history stay consistent, undo works, nothing is edited in place that must not be',
+    migration: 'migrations: one-way schema changes, backfills, what happens to existing data, how to roll back',
+  }
+  const ROUTE = Object.assign({ low: { lenses: ['correctness'], model: 'work' }, medium: { lenses: ['correctness'], model: 'verify' }, high: { lenses: ['correctness', 'security', 'ui'], model: 'verify' } }, (P.routing && P.routing.risk) || {})
+  const SURFACE_ROUTE = Object.assign({ security: { lens: 'security', model: 'verify' }, ui: { lens: 'ui', model: 'work' }, money: { lens: 'money', model: 'verify' }, data: { lens: 'data', model: 'verify' }, migration: { lens: 'migration', model: 'verify' } }, (P.routing && P.routing.surfaces) || {})
+  const modelOf = (key) => ({ work: W, verify: VERIFY_M, approve: APPROVE_M, plan: PLAN_M, cheap: CHEAP })[key] || M[key] || key
+  const base = ROUTE[RISK] || ROUTE.medium
+  const routed = new Map(base.lenses.map((l) => [l, modelOf(base.model)]))
+  for (const s of (A.surfaces || [])) if (SURFACE_ROUTE[s] && !routed.has(SURFACE_ROUTE[s].lens)) routed.set(SURFACE_ROUTE[s].lens, modelOf(SURFACE_ROUTE[s].model))
+  const LENSES = [...routed.keys()]
+  log(`verify routing: risk ${RISK}${(A.surfaces || []).length ? `, surfaces ${A.surfaces.join(', ')}` : ''} -> ${LENSES.map((l) => `${l} (${routed.get(l)})`).join(', ')}`)
+  result.routing = { risk: RISK, surfaces: A.surfaces || [], lenses: Object.fromEntries(routed) }
+  const reviews = (await parallel(LENSES.map((key) => [key, LENS_TEXT[key] || key]).map(([key, lens]) => () => run(
     `Review the uncommitted diff of ${NAME} run ${A.run} (git diff; new files included) through this lens: ${lens}.
 Read .agent/plan.md for intent and ${REVIEW_RULES}. Each finding cites a rule heading from those files, or names a concrete failing
 behaviour (input -> wrong output); anything else is an opinion: leave it out. Confirm every finding against the code before you report it:
 a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, with file:line. Change nothing.`,
-    { label: `Verifier: ${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: verifyModel })))).filter(Boolean)
+    { label: `Verifier: ${key}`, phase: 'Verify', schema: FINDINGS, model: routed.get(key) })))).filter(Boolean)
   result.verify = reviews
   const serious = reviews.flatMap((r) => r.findings).filter((f) => f.severity === 'blocker' || f.severity === 'major' || f.severity === 'minor')
   if (serious.length && result.rounds.build < BUDGET.build) {

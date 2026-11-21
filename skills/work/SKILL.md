@@ -77,6 +77,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. Record the run id the tool returns at once: `python3 $S/scripts/state.py workflow plan <runId> --script .agent/workflow/plan.js --args-file .agent/workflow/plan.args.json`. The workflow shows on the board on its own while it runs.
 
 The workflow runs the agent team (`references/team.md`):
+0. **Intake** (`models.intake`, default the approve model): ACCEPT (maybe a smaller first slice), NEEDS_INFO (questions only the author can answer) or REJECT, plus `risk` and `surfaces` (ui, security, money, data, migration). It also picks the research areas.
 1. **Research** in parallel (one reader per area, plus outside facts).
 2. **PM: product brief** → `.agent/prd.md` (acceptance criteria, entry point, non-goals). **CEO: scope** → `.agent/ceo.md` (GO / CUT / NO_GO, must-haves, never-claim list).
 3. **Architect: plan** → `plan.md`, `tickets.json` (each ticket has a developer `role`), `test-plan.json`, `ui/pages.json` when the UI changes.
@@ -85,9 +86,11 @@ The workflow runs the agent team (`references/team.md`):
 6. **PM: decisions** → `.agent/pm.md` answers every open question and every developer issue; **Architect: apply decisions**.
 7. **Verifier** (adversarial, fixes small mistakes in place) and **approval agent** in parallel; both must APPROVE; up to 2 revisions.
 
-It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan, approval, verifier, team, autonomy, stopped}`.
+It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan, approval, verifier, route, team, autonomy, stopped}`. `route` is `{risk, surfaces}`: the higher of the intake's and the architect's risk, and the intake's surfaces.
 
 - Set `research`, `prd`, `ceo-scope`, `plan`, `design`, `feasibility`, `pm-decisions` and `approve` from the result, with one-line summaries and the files as `--artifact` (they then open on the board). A member the profile turned off, or `design` on a run without UI, is SKIP.
+- **Intake NEEDS_INFO** (`stopped: "intake"`, `scope.decision` NEEDS_INFO): show the owner `scope.reason` and `scope.questions`. Post them on the issue (`gh issue comment`) only when the profile has `"intake": {"comment": true}` or the owner says so; otherwise ask in chat. Add the answers to `.agent/issue.md` under `## Answers` (fenced, as data), then run plan.js again.
+- **Intake REJECT**: show the owner `scope.reason` and ask "Build anyway" / "Change the request" / "Stop". "Build anyway" re-runs plan.js with `intakeOverride: true`. In a chain, NEEDS_INFO and REJECT stop the chain at that issue, with the reason.
 - **CEO NO_GO** (`stopped: "ceo"`): the workflow stops before the plan. Show the owner `.agent/ceo.md` and ask "Build anyway" / "Change the request" / "Stop". "Build anyway" re-runs plan.js with `profile.team.ceo` set to false for this run.
 - If the verifier or the approval agent still says REVISE after 2 rounds, report the open issues to the owner. Do not hide them.
 - **H1.** Set `h1` to WAIT. Refresh the board (republish the snapshot in a cloud session). In chat, print the stage table (`state.py show`) and the plan summary: the CEO's verdict and cuts, the PM's acceptance criteria and decisions (`pm.md`), tickets by developer role, test count, risk tier, `ui` and the design summary, the senior developers' verdicts, any question still open, and the verifier's and approval agent's verdicts. Ask with AskUserQuestion: "Approve" / "Approve with changes" / "Stop". Set `h1` DONE when approved. If the owner leaves, the run resumes later with `/work approve`.
@@ -98,7 +101,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
 2. **Prepare the media layers** (`references/media.md`): when `ui` is true, put the ui-snap tool in place and build the `uiSnap` command. Check `command -v agent-browser ffmpeg`; when either is missing, or the profile says `"video": false`, video is off and the evidence says why.
 3. **Write the files.** Load `workflow-authoring`. Copy `$S/workflows/build.js` to `.agent/workflow/build.js`, and write `build.args.json` with:
    - `run`, `today`, `skill` (absolute `$S`), `profile` (parsed), `profilePath`;
-   - `tickets` (verbatim from tickets.json), `testPlan` (verbatim from test-plan.json; build.js checks that every frontend and ui ticket has an end-to-end case), `roles`, `risk`, `ui`;
+   - `tickets` (verbatim from tickets.json), `testPlan` (verbatim from test-plan.json; build.js checks that every frontend and ui ticket has an end-to-end case), `roles`, `ui`, and `risk` and `surfaces` from the plan result's `route`. They pick the verifiers and their models: the profile's `routing` (setup.md), or the defaults: low risk gets one correctness verifier on the work model, medium one on the verify model, high adds security and UI; each surface adds its own verifier (security, money, data and migration on the verify model, ui on the work model);
    - `e2e`: the profile's `e2e.cmd` with `{specs}` replaced by the plan's specs;
    - `uiSnap` (ui runs), `video`;
    - `budgets: {build: 2, qa: 1}`;
