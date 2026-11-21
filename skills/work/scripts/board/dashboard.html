@@ -888,6 +888,10 @@ async function poll() {
 // ---- events ----
 $('run-btn').addEventListener('click', (e) => { e.stopPropagation(); $('run-pop').hidden ? openPop() : closePop() })
 $('openSettings').addEventListener('click', openSettings)
+$('settings').addEventListener('click', (e) => {
+  const r = $('settings').getBoundingClientRect()
+  if (e.target === $('settings') && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) $('settings').close()
+})
 function toggleHist(force) {
   const show = force === undefined ? $('hist-pop').hidden : force
   $('hist-pop').hidden = !show
