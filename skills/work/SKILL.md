@@ -222,9 +222,16 @@ For dependent issues the owner wants built while away (4, then 5 on top of 4, th
 
 For issues that do not depend on each other (no shared files, neither needs the other's code). First check that from the issues and the code; if one needs another, say so and offer a chain instead. Lanes need the profile's `lanes` section (`references/setup.md`).
 
-1. For each issue: `python3 $S/scripts/lanes.py add <n> --slug <slug>`. It creates `../<repo>-lane-<n>` on its own branch from `origin/<base>`, picks free ports, and writes `.agent/profile.json` there: the profile with that lane's app URL and every command prefixed with its port variables.
-2. Tell the owner to open one Claude Code session per lane folder (the plugin must be installed at user scope, or the lane copies `.claude/settings.local.json`) and run `/work <n>` in each. Each lane has its own board, dev server and `.agent/`, so they run side by side.
-3. `lanes.py list` shows the lanes; `lanes.py remove <n>` removes a lane once its branch is pushed.
+This session is the **one orchestrator for every lane**: it starts each lane's workflows in the background, advances a lane when its workflow reports back, and stays free for the owner in between. No other session is opened.
+
+1. **Worktrees.** For each issue: `python3 $S/scripts/lanes.py add <n> --slug <slug>`. It creates the lane's own git worktree at `.claude/worktrees/lane-<n>` (git-excluded) on `<branch_prefix><n>-<slug>` from `origin/<base>`, picks free ports, and writes the lane's `.agent/profile.json` (its app URL, and every gate and e2e command with its port variables) and `.agent/lane.json`. The worktree stays until `lanes.py remove`, so a lane that waits on the owner keeps its work.
+2. **Per lane, the same run as `/work <n>`**, with every command run from the lane folder (`cd <lane dir> && …`): intake (issue file, work type, `state.py init`, issue sync), the board (`wfboard.py --repo <lane dir>`: each lane has its own board on the next free port), then the plan workflow. Pass `dir: <lane dir>`, `branch`, `lane: <n>` and the lane's profile in every workflow's args: each agent's prompt then starts with the lane header, so it works only in that worktree and its labels start with `lane <n> ·`.
+3. **Run lanes side by side:** start each lane's workflow, record its run id in that lane (`cd <lane dir> && state.py workflow …`), then end the turn with one line per lane. Up to `lanes.concurrency` (default 3) workflows at once. When one reports back, advance only that lane (§2–§6) and start its next workflow; never wait on one lane to start another.
+4. **Gates.** Autonomy for lanes is `owner` unless the profile says `agents`: ask H1 and H2 here, one lane per question, naming the lane ("Lane 6, bulk edit: approve the plan?"). The other lanes keep running while a question waits.
+5. **Ship** each lane on its own branch and PR (§6), from its folder. The first PR merged may conflict with the second on shared wiring: rebase the second onto `origin/<base>` and run its gate again before it ships.
+6. `lanes.py status` lists the lanes with their stage and ports. `lanes.py remove <n>` removes a lane once its branch is pushed.
+
+Without the Workflow tool (a headless run, or a host without it), run each lane's stages with the Agent tool in the background (`references/stages.md`), each prompt starting with the same lane header. On Claude Code, `lanes.py launch <n> --main <this session's name>` starts a lane as a separate background session (`claude --bg`, listed by `claude agents`) instead, for very long unattended lanes; it reports back here with SendMessage.
 
 ## Usage limits: pause before the plan runs out
 

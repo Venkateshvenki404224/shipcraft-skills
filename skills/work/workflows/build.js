@@ -82,9 +82,12 @@ Do not commit, push or touch git history.`
 const RULES = `${RULES0} ${SUMMARY_RULE}`
 
 // An agent that dies on an API error returns null: try it up to 3 times before giving up on that step.
+// A lane (`/work lanes`): every agent works only in the lane's own worktree. One orchestrator runs every lane's workflows.
+const LANE_DIR = A.dir || ''
+const LANE_HEAD = LANE_DIR ? `LANE: work ONLY in the git worktree ${LANE_DIR}${A.branch ? ` (branch ${A.branch})` : ''}. Start every Bash command with \`cd ${LANE_DIR} && \`, give Read, Edit, Write, Grep and Glob absolute paths under ${LANE_DIR}, and read every \`.agent/\` path as ${LANE_DIR}/.agent/. Never touch the main checkout or another lane.\n\n` : ''
 async function run(prompt, opts) {
   for (let i = 0; i < 3; i++) {
-    const r = await agent(prompt, { ...opts, label: i ? `${opts.label} (retry ${i})` : opts.label })
+    const r = await agent(LANE_HEAD + prompt, { ...opts, label: `${LANE_DIR && A.lane ? `lane ${A.lane} · ` : ''}${i ? `${opts.label} (retry ${i})` : opts.label}` })
     if (r) return r
     log(`${opts.label}: no result, attempt ${i + 1}/3`)
   }

@@ -100,5 +100,5 @@ When the profile is missing (or the owner says `/work setup`):
 }
 ```
 
-Lane k gets every port plus k × `step`. Every gate, e2e and app command in the lane's profile runs with `env` set, so the project's scripts must read those variables (a dev server address, a test server port, a Docker project name). Leave `lanes` out when the project cannot run twice on one machine.
+Lane k gets every port plus k × `step`. Every gate, e2e and app command in the lane's profile runs with `env` set, so the project's scripts must read those variables (a dev server address, a test server port, a Docker project name). Leave `lanes` out when the project cannot run twice on one machine. `concurrency` (default 3) caps how many lane workflows run at once. Lane worktrees live in `.claude/worktrees/lane-<n>` (git-excluded).
 
