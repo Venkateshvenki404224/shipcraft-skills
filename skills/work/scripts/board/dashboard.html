@@ -36,7 +36,6 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hid
 .controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:nowrap;position:relative;min-height:38px}
 .controls .live{min-width:92px;white-space:nowrap;font-variant-numeric:tabular-nums}
 #run-btn-name{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
-@media (max-width:720px){header{grid-template-columns:minmax(0,1fr)}.controls{justify-content:flex-start}.controls .live{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}.controls .tools{margin-left:auto}}
 .controls .tools{display:inline-flex;gap:6px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
 .btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
 .btn svg{flex:none}
@@ -243,6 +242,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.stepper{grid-template-columns:repeat(min(var(--n,9),5),minmax(0,1fr))}.step:nth-child(5n+1):before{display:none}}
 @media (max-width:720px){.docs{grid-template-columns:1fr}.doclist{border-right:0;border-bottom:1px solid var(--border);max-height:220px}.stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.step:before{display:none}.tbl .hide-sm{display:none}.viewer{padding:6px 14px 20px}
   .d-head{padding:16px}.d-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.files{border-right:0;border-bottom:1px solid var(--border);display:flex;gap:4px;overflow-x:auto;padding:8px}.files .group{display:none}.file{width:auto;white-space:nowrap}.doc{padding:18px 16px 48px}.ui-pair{grid-template-columns:1fr}}
+@media (max-width:720px){header{grid-template-columns:minmax(0,1fr)}.controls{justify-content:flex-start;gap:6px}.controls .live{min-width:0;font-size:0;gap:0;padding:8px}.controls .kbd{display:none}.controls .tools{margin-left:auto;border-left:0;padding-left:0}}
 </style>
 </head>
 <body>
