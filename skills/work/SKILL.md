@@ -100,7 +100,10 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
    - `tickets` (verbatim from tickets.json), `testPlan` (verbatim from test-plan.json; build.js checks that every frontend and ui ticket has an end-to-end case), `roles`, `risk`, `ui`;
    - `e2e`: the profile's `e2e.cmd` with `{specs}` replaced by the plan's specs;
    - `uiSnap` (ui runs), `video`;
-   - `budgets: {build: 2, qa: 1}`.
+   - `budgets: {build: 2, qa: 1}`;
+   - `base`: `origin/<the run's base branch>` (a chain's previous branch, or `origin/<base>`), and `protectedOk`: the protected paths the owner allowed for this run at H1 (usually none).
+
+   The gate runs `scripts/protected.py` after the profile's gate commands: a change to a `protected_paths` file (the checks and config the branch is judged by) is a red gate. When the plan really needs one changed, list it at H1 and ask; only the owner adds it to `protectedOk`. In an unattended run, an agent never allows one: the run stops and asks.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
 4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`, and record its run id: `python3 $S/scripts/state.py workflow build <runId> --script .agent/workflow/build.js --args-file .agent/workflow/build.args.json`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
@@ -143,6 +146,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
      `git diff --name-only origin/<base>...HEAD | xargs grep -lE '\.agent/|/Users/|/home/[a-z]'` is empty (files of this skill itself excepted).
    - Nothing from the profile's `secrets`, `.agent/`, the ui-snap copy, `test-results/` or `node_modules/` is in the diff.
    - If `ui`: `.agent/ui/review.json` exists and is newer than `.agent/ui/shots.json`.
+   - `python3 $S/scripts/protected.py --base origin/<base> --profile <PROFILE_PATH> [--allow <each protectedOk path>]` prints `ok`.
 3. Land it by the profile's `ship.mode`:
    - `pr` (default): run `python3 $S/scripts/branch_guard.py --base <base>` first; on `stale`, run it with `--new <a new branch name>` so the commit never lands on a merged or closed branch. Then commit on the branch with a feature-level message, then ask once before `git push -u origin <branch>` and `gh pr create` (title from the request; body from the evidence summary, without `.agent/` paths).
    - `squash`: `git checkout <base> && git merge --squash <branch>`, commit with a feature-level message, then ask once before `git push origin <base>`.
