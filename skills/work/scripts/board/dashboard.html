@@ -595,10 +595,10 @@ function renderHistory() {
 
 let settings = null
 const TIERS = {
-  lean: { note: 'Sonnet plans, builds and reviews; Haiku for PM, CEO, designer, research and gate runs. Small issues skip the CEO design review and the senior devs, one plan revision, lower effort. About $5 to $8 per issue.',
-    models: { plan: 'sonnet', approve: 'sonnet', research: 'haiku', work: 'sonnet', pm: 'haiku', ceo: 'haiku', design: 'haiku', senior: 'sonnet', verify: 'sonnet', cheap: 'haiku' } },
-  balanced: { note: 'Opus for the architect, approver, senior devs and verifiers; Sonnet builds; Haiku researches. Medium team, two revisions.',
-    models: { plan: 'opus', approve: 'opus', research: 'haiku', work: 'sonnet', pm: 'sonnet', ceo: 'sonnet', design: 'sonnet', senior: 'opus', verify: 'opus', cheap: 'haiku' } },
+  lean: { note: 'Sonnet plans and builds; Opus for the guardrails (PM, CEO, verifiers); Haiku for designer, research and gate runs. Small issues skip the CEO design review and the senior devs, one plan revision, lower effort.',
+    models: { plan: 'sonnet', approve: 'sonnet', research: 'haiku', work: 'sonnet', pm: 'opus', ceo: 'opus', design: 'haiku', senior: 'sonnet', verify: 'opus', cheap: 'haiku' } },
+  balanced: { note: 'Opus for the architect, approver, senior devs, verifiers, PM and CEO; Sonnet builds; Haiku researches. Medium team, two revisions.',
+    models: { plan: 'opus', approve: 'opus', research: 'haiku', work: 'sonnet', pm: 'opus', ceo: 'opus', design: 'sonnet', senior: 'opus', verify: 'opus', cheap: 'haiku' } },
   max: { note: 'Fable plans and approves, Opus everywhere else, full team on every issue. For risky or large issues; the most expensive.',
     models: { plan: 'fable', approve: 'fable', research: 'sonnet', work: 'opus', pm: 'opus', ceo: 'opus', design: 'opus', senior: 'opus', verify: 'opus', cheap: 'haiku' } },
 }
