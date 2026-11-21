@@ -99,9 +99,6 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
 .pill.issue{background:var(--red-soft);color:var(--red)}
 .pill.changes{background:var(--amber-soft);color:var(--amber)}
 .pill.wait{background:var(--pink-soft);color:var(--pink)}
-.status-line{margin-top:.35rem;font-size:1rem;font-weight:600}
-.problem{margin:.5rem 0;padding:.6rem .9rem;border-radius:10px;background:var(--amber-soft);color:var(--text);outline:1px solid var(--amber)}
-.problem.soft{outline-color:var(--border);background:var(--surface-2)}
 .app-link{display:flex;gap:.5rem;align-items:center;margin:.5rem 0 1rem;padding:.6rem .9rem;border-radius:10px;background:var(--surface-2);font-size:.95rem}
 .app-link a{color:inherit;font-weight:600}
 .app-link .h{color:var(--muted)}
@@ -230,7 +227,6 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
       <div style="min-width:0">
         <h1 id="title">Run board</h1>
         <div class="sub" id="subtitle">connecting…</div>
-        <div class="status-line" id="status-line" data-testid="status-line"></div>
       </div>
     </div>
     <div class="controls">
@@ -463,9 +459,7 @@ function render() {
   $('title').textContent = run.name
   $('subtitle').innerHTML = [esc(run.state), isPipeline(run) ? '/work pipeline' : 'workflow run', `started ${esc(ago(run.started))}`, `elapsed ${dur(run.elapsed)}`, money(run.cost) + ' est.']
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
-  $('status-line').textContent = statusLine(run, gs)
   $('banner').innerHTML = (run.error ? `<div class="banner">${esc(run.error)}</div>` : '')
-    + (run.problem ? `<div class="problem ${run.problem.state === 'retried' ? 'soft' : ''}" data-testid="problem"><b>${run.problem.state === 'retried' ? 'Recovered' : run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'}:</b> ${esc(run.problem.why)}. ${esc(run.problem.fix)}</div>` : '')
     + (run.app ? `<div class="app-link ${run.app.up ? 'up' : 'down'}" data-testid="app-link"><span class="sdot ${run.app.up ? 'finished' : 'failed'}"></span>The app: <a href="${esc(run.app.url)}" target="_blank" rel="noopener">${esc(run.app.url)}</a> <span class="h">${run.app.up ? 'up' : `not answering${run.app.start ? ` · start it with <code>${esc(run.app.start)}</code>` : ''}`}</span></div>` : '')
 
   // KPIs
@@ -499,23 +493,6 @@ function render() {
   renderTable(run, gs)
   renderEvidence(run)
   renderDocs(run)
-}
-
-function statusLine(run, gs) {
-  const phases = run.phases || []
-  const wait = gs.find((g) => cat(g) === 'wait')
-  if (run.problem && run.problem.state !== 'retried') return `${run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'} in the ${run.problem.kind} workflow. Run /work resume in the Code tab to continue.`
-  if (wait) return `Waiting on you: ${wait.title}. Answer in the Code tab.`
-  const running = gs.filter((g) => cat(g) === 'running' && g.id !== 'Orchestrator/main')
-  const done = gs.filter((g) => cat(g) === 'done').length
-  const left = gs.filter((g) => ['queued', 'running', 'wait'].includes(cat(g)))
-  if (!left.length) return `Finished: ${done} of ${gs.length} steps done.`
-  const nextGate = left.find((g) => (g.agents[0] || {}).model === 'owner' || /^h\d$/.test(g.key || ''))
-  if (running.length) {
-    const a = running[0], live = a.agents.filter((x) => x.status === 'RUN').map((x) => x.label).slice(0, 2).join(', ')
-    return `${a.phase}: ${live || a.title}. ${done} of ${gs.length} steps done${nextGate ? `; ${nextGate.title.split(':')[0]} needs you next` : ''}.`
-  }
-  return `Between steps: ${done} of ${gs.length} done; next is ${left[0].title}.`
 }
 
 function renderRoles(run, gs) {

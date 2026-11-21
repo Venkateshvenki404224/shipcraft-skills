@@ -28,7 +28,6 @@ You are the orchestrator. You do not write feature code yourself. You:
 | `/work approve [changes…]` | Owner gate H1 passed → build. With text: one re-plan applying it, then build |
 | `/work ship` · `/work fix then ship: <themes>` | Owner gate H2 → ship (§6), or one more fix round, then ship |
 | `/work status` | Print the stage table (`state.py show`), the board link, and what waits on whom |
-| `/work resume` | A workflow stopped (network drop, API error, closed laptop): continue it from where it stopped (§ Recovery) |
 | `/work board` | Start the board again (or republish the snapshot) and give the link |
 
 Do not post to GitHub issues or add CI workflows unless the owner asks. Reading an issue with `gh issue view` is fine.
@@ -67,7 +66,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    ```
 
    Pass the date from your context; scripts cannot read the clock.
-3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. Record the run id the tool returns at once: `python3 $S/scripts/state.py workflow plan <runId> --script .agent/workflow/plan.js --args-file .agent/workflow/plan.args.json`. The workflow shows on the board on its own while it runs.
+3. Mark `research` RUN, then call `Workflow({scriptPath: ".agent/workflow/plan.js", args: <that object>})`. Pass `args` as a JSON value, not a string. The workflow shows on the board on its own while it runs.
 
 The workflow runs the agent team (`references/team.md`):
 1. **Research** in parallel (one reader per area, plus outside facts).
@@ -97,7 +96,7 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
    - `budgets: {build: 2, qa: 1}`.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
-4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`, and record its run id: `python3 $S/scripts/state.py workflow build <runId> --script .agent/workflow/build.js --args-file .agent/workflow/build.args.json`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
+4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
 5. **When the Workflow tool is missing** (a headless run), run the same stages with the Agent tool, in the order and with the prompts in `references/stages.md`, and record each stage as it finishes so the board stays current.
 
 ## 4. Media layers
@@ -142,22 +141,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - `squash`: `git checkout <base> && git merge --squash <branch>`, commit with a feature-level message, then ask once before `git push origin <base>`.
 
    End the commit message with the attribution lines the session gives you.
-4. **Wait for CI before anything else** (`pr` mode): run `python3 $S/scripts/ci_wait.py <pr number>` (it waits up to 30 minutes and prints one verdict).
-   - `green`: go on.
-   - `red`: read the failing checks' logs (`gh run view <id> --log-failed`), fix on the same branch while the build budget lasts, push (the PR updates), and wait again. When the budget is spent, report the failures to the owner and stop.
-   - `none`: the repository runs no CI on pull requests; say so.
-   - `pending`: still running after 30 minutes; say which checks, and ask the owner whether to keep waiting.
-5. Run `state.py step ship --status DONE` (with the CI verdict in the summary) and `state.py finish`. Refresh the board one last time. Then report in one message: the PR link, the CI verdict per check, and what the owner does next (merge on green). Ask a closing question only when it changes something: do not offer to comment on the issue when the PR body already says `Closes #<n>` (GitHub links them and closes the issue on merge). Never comment unasked.
-
-## Recovery: `/work resume`
-
-A single agent that dies (a network drop, an API error) is retried by the workflow up to 3 times, and the board says "Recovered". When the whole workflow stops, the board says "Stopped" or "Stalled" (no agent has written anything for 15 minutes) with the reason. Then:
-
-1. Read the recorded run: `python3 $S/scripts/state.py show` prints `workflow plan|build: <runId> (<script>)`.
-2. If that run is still listed as running in this session, stop it first (TaskStop), so two copies do not edit the same files.
-3. Resume it in this session: `Workflow({scriptPath: <script>, resumeFromRunId: <runId>, args: <the JSON in its args file>})`. Every agent that finished returns its cached result at once; only the failed and unstarted ones run again. Record the new run id with `state.py workflow`.
-4. A resume works only in the session that started the run. If that session is gone, start the same workflow again with the same args file and say in the evidence that it ran twice. Check `git status` first: files the first run already changed stay, and the agents build on them.
-5. Tell the owner, in one sentence, what stopped, what you resumed and what runs next.
+4. Run `state.py step ship --status DONE` and `state.py finish`. Refresh the board one last time. If the run came from an issue, offer to comment the link on it. Do not comment unasked.
 
 ## Unattended runs (`"autonomy": "agents"`)
 
@@ -170,7 +154,6 @@ Only when the profile says `"autonomy": "agents"`. Setup asks this on first use 
 
 ## Rules that always apply
 
-- **Reviews stay independent.** When a verifier, the UI/UX designer, QA or the CEO checks work again after a fix, give it only what the first review got (the files, the screenshots, the plan) and its own earlier findings. Never put the fixer's claims, your own measurements or the verdict you expect in its prompt ("the header now starts at x=64", "this should pass now"): a reviewer told the answer is no longer a check, and auto mode flags such prompts as undermining oversight. Let it measure and decide; if it still fails, that is the result.
 - **No commit on a stale branch.** Before every commit (setup, ship, a fix round the owner asks for), run `python3 $S/scripts/branch_guard.py --base <base>`. `stale` means the current branch is the base, or its pull request is merged or closed, or all its commits are already in the base: run it with `--new <name>` and commit there. The one exception is `ship.mode: squash`, which commits on the base by design. `ok` with an open PR means the commit joins that PR: after pushing, rewrite the PR description so it covers every commit on the branch, not only the first ones (`gh pr edit <n> --body-file <file>`).
 - **Owner gates are never skipped** in the default `"autonomy": "owner"`. Nothing is pushed without the owner's yes; with `"agents"`, only the run branch, and only with `ship.auto_push`.
 - **The board and the table stay current.** Every stage you start or finish goes through `state.py`; in a cloud session, republish the snapshot at H1, after QA and at H2.

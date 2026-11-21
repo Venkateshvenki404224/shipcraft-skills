@@ -317,14 +317,10 @@ def export_run(run_dir, now):
     # The Workflow tool writes the run's final status to <session>/workflows/<run_id>.json, not to the journal.
     # Without this, an agent superseded by a resume (started, never got a result) shows as running forever.
     try:
-        wf_meta = json.load(open(os.path.join(session_dir, "workflows", run_id + ".json")))
+        wf_status = json.load(open(os.path.join(session_dir, "workflows", run_id + ".json"))).get("status")
     except Exception:
-        wf_meta = {}
-    wf_status = wf_meta.get("status")
+        wf_status = None
     finished = finished or (wf_status not in (None, "", "running", "pending", "queued"))
-    wf_args = wf_meta.get("args") if isinstance(wf_meta.get("args"), dict) else {}
-    wf_error = wf_meta.get("error") or (wf_meta.get("result") or {}).get("error") if isinstance(wf_meta.get("result"), dict) else wf_meta.get("error")
-    name = wf_meta.get("workflowName") or name
 
     base = os.path.join(OUT, run_id)
     tickets = {}
@@ -453,11 +449,6 @@ def export_run(run_dir, now):
     # tickets still unstarted that is a stall; otherwise the run is complete.
     state = "finished" if finished else ("running" if running else (
         ("stalled" if queued else "completed") if j_age > 600 else "between steps"))
-    if wf_status in ("failed", "error", "killed", "aborted", "cancelled"):
-        state = "failed"
-    elif running and j_age > STALE:
-        state = "stalled"
-    failed_agents = [g_a["label"] for g in groups for g_a in g["agents"] if g_a["status"] == "FAIL" or "(retry" in g_a["label"]]
     seen_phases = [g["phase"] for g in groups]
     cols = phases + [p for p in dict.fromkeys(seen_phases) if p not in phases]
     return {
@@ -466,11 +457,6 @@ def export_run(run_dir, now):
         "agents": len(agents), "running": running, "cost": round(total_cost, 2),
         "started": first, "updated": last, "elapsed": ((now if not finished else (last or now)) - first) if first else 0,
         "_prompt_head": prompt_head,
-        "_args_run": wf_args.get("run"),
-        "script": wf_meta.get("scriptPath"),
-        "error": str(wf_error) if wf_error else None,
-        "failed_agents": failed_agents,
-        "idle": int(j_age),
     }
 
 
@@ -524,42 +510,11 @@ def step_of(label, phase):
     return PHASE_STEP.get(phase)
 
 
-def belongs(r, run_name, ids):
-    if r["id"] in ids:
-        return True
-    if run_name and r.get("_args_run") == run_name:
-        return True
-    return bool(run_name) and re.search(r"\brun " + re.escape(run_name) + r"\b", r.get("_prompt_head") or "") is not None
-
-
-
-def short_label(label):
-    m = re.match(r"^([^:]+):\s*(T\d+)\b", label or "")
-    if m:
-        return f"{m.group(1)} {m.group(2)}"
-    return label if len(label or "") <= 40 else label[:39].rstrip(" ,:") + "…"
-
-def run_problem(mine):
-    for r in sorted(mine, key=lambda r: r.get("started") or 0, reverse=True)[:1]:
-        names = {"work-plan": "plan", "work-build": "build"}
-        phases = {g.get("phase") for g in r.get("groups", [])}
-        kind = names.get(r.get("name")) or ("build" if phases & {"Tests first", "Implement", "Gate + E2E"} else "plan" if "Research" in phases else "workflow")
-        if r["state"] in ("failed", "stalled"):
-            why = r.get("error") or (f"no agent has written anything for {r.get('idle', 0) // 60} min" if r["state"] == "stalled" else "the workflow ended with an error")
-            return {"kind": kind, "run_id": r["id"], "state": r["state"], "why": why,
-                    "fix": f"In the Code tab, run /work resume: it continues {r['id']} from where it stopped and reuses every agent that finished."}
-        if r.get("failed_agents"):
-            names_ = [re.sub(r" \(retry \d+\)$", "", x) for x in r["failed_agents"]]
-            return {"kind": kind, "run_id": r["id"], "state": "retried",
-                    "why": f"{len(names_)} agent(s) failed (often a network drop) and were retried: " + ", ".join(short_label(n) for n in names_[:3]),
-                    "fix": "Nothing to do: the run retried them and kept going."}
-    return None
-
-
-def workflow_agents(wf_runs, run_name, ids=()):
+def workflow_agents(wf_runs, run_name):
     linked = {}
+    tag = re.compile(r"\brun " + re.escape(run_name) + r"\b") if run_name else None
     for r in sorted(wf_runs, key=lambda r: r.get("started") or 0):
-        if not belongs(r, run_name, ids):
+        if not tag or not tag.search(r.get("_prompt_head") or ""):
             continue
         for g in r.get("groups", []):
             for a in g.get("agents", []):
@@ -712,10 +667,7 @@ def app_info(root, now):
 
 def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     m = json.load(open(manifest, encoding="utf-8"))
-    wf_ids = {rec.get("run_id") for rec in (m.get("workflows") or {}).values() if isinstance(rec, dict)}
-    linked = workflow_agents(wf_runs, m.get("run"), wf_ids)
-    mine = [r for r in wf_runs if belongs(r, m.get("run"), wf_ids)]
-    problem = run_problem(mine)
+    linked = workflow_agents(wf_runs, m.get("run"))
     root = os.path.dirname(os.path.dirname(manifest))
     run_id = "pl_" + re.sub(r"[^A-Za-z0-9_-]+", "-", m.get("run") or os.path.basename(root)).strip("-")[:48]
     base = os.path.join(OUT, run_id)
@@ -843,7 +795,6 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     return {"id": run_id, "name": m.get("name") or m.get("run") or run_id, "state": state, "events": [],
             "phases": cols, "groups": groups, "artifacts": arts, "agents": n_agents, "running": n_running,
             "app": app_info(root, now),
-            "problem": problem,
             "ui": export_ui(root, base, run_id),
             "videos": export_video(root, base, run_id),
             "cost": round(total_cost, 2), "started": first, "updated": last,
@@ -873,7 +824,6 @@ def export_once(project_dirs, pipeline_globs):
         runs.extend(wf_runs)
         for r in runs:
             r.pop("_prompt_head", None)
-            r.pop("_args_run", None)
         state = {"generated": now, "project": project_dirs, "runs": runs}
     except Exception as e:
         state = {"generated": now, "error": str(e), "runs": []}

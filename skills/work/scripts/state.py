@@ -7,7 +7,6 @@
     state.py set    <key> --status DONE [--summary "..."]       # update an existing step
     state.py finish [--stopped]
     state.py show [--plain]                                    # stage table (markdown) for chat and /work status
-    state.py workflow plan|build <run_id> [--script .agent/workflow/plan.js] [--args-file .agent/workflow/plan.args.json]
 
 Statuses: RUN DONE PASS FAIL CHANGES WAIT TODO SKIP STOPPED (WAIT = the owner's turn).
 Writes atomically; never touches anything outside .agent/.
@@ -105,11 +104,6 @@ def main():
         s.add_argument("--detail-file")
         s.add_argument("--artifact", action="append", default=[])
         s.add_argument("--deps")
-    w = sub.add_parser("workflow", help="record a Workflow run of this /work run, so the board links it and /work resume can continue it")
-    w.add_argument("kind", choices=["plan", "build"])
-    w.add_argument("run_id")
-    w.add_argument("--script")
-    w.add_argument("--args-file")
     f = sub.add_parser("finish")
     f.add_argument("--stopped", action="store_true")
     sh = sub.add_parser("show")
@@ -162,15 +156,6 @@ def main():
             st["deps"] = [d.strip() for d in a.deps.split(",") if d.strip()]
         save(m)
         print(f"{a.key}: {st.get('status')}")
-    elif a.cmd == "workflow":
-        rec = {"run_id": a.run_id}
-        if a.script:
-            rec["script"] = a.script
-        if a.args_file:
-            rec["args_file"] = a.args_file
-        m.setdefault("workflows", {})[a.kind] = rec
-        save(m)
-        print(f"workflow {a.kind}: {a.run_id}")
     elif a.cmd == "finish":
         m["finished"] = True
         for s in m["steps"]:
@@ -180,8 +165,6 @@ def main():
         print("finished")
     elif a.cmd == "show":
         print(f"**{m.get('run')}** · {m.get('name')}{' · finished' if m.get('finished') else ''}\n")
-        for kind, rec in (m.get("workflows") or {}).items():
-            print(f"workflow {kind}: {rec.get('run_id')} ({rec.get('script', '')})")
         if a.plain:
             for s in m["steps"]:
                 print(f"  {s.get('status', 'TODO'):8} {s.get('phase', ''):12} {s.get('key'):18} {s.get('summary', '')[:90]}")
