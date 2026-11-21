@@ -1043,6 +1043,7 @@ def read_settings():
     return {"profile_path": os.path.relpath(prof_path, REPO) if prof_path else None,
             "tier": {"repo": prof.get("tier") or "balanced", "run": over.get("tier")},
             "knobs": {"repo": prof.get("knobs") or {}, "run": over.get("knobs") or {}},
+            "merge": {"repo": (prof.get("ship") or {}).get("merge") or "owner", "run": over.get("merge")},
             "available_models": prof.get("available_models") or ["opus", "sonnet", "haiku", "fable"],
             "model_fallback": prof.get("model_fallback"),
             "repo": view(prof, team), "run": over}
@@ -1100,6 +1101,13 @@ def apply_settings(scope, body):
         if k == "garden" and v and isinstance(target.get("garden"), dict):
             continue
         target[k] = v if k != "garden" or not v else {"log": "docs/garden.md", "repeat": 2}
+    if "merge" in body:
+        if body["merge"] not in ("auto", "owner"):
+            raise ValueError("merge must be auto or owner")
+        if scope == "repo":
+            target.setdefault("ship", {})["merge"] = body["merge"]
+        else:
+            target["merge"] = body["merge"]
     for k, v in (body.get("team") or {}).items():
         if k not in TEAM_KEYS or not isinstance(v, bool):
             raise ValueError(f"bad team setting {k}")
