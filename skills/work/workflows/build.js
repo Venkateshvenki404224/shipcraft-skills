@@ -31,7 +31,9 @@ const APP = P.app || {}
 const ROLES = A.roles && A.roles.length ? A.roles : (P.roles && P.roles.length ? P.roles : [])
 const RISK = A.risk || 'medium'
 const BUDGET = { build: (A.budgets && A.budgets.build) ?? 2, qa: (A.budgets && A.budgets.qa) ?? 1 }
-const GATE = (P.gate || []).map((c, i) => `${i + 1}. ${c}`).join('\n')
+const BASE_REF = A.base || `origin/${P.base || 'main'}`
+const PROTECT = `python3 ${SKILL}/scripts/protected.py --base ${BASE_REF}${A.profilePath ? ` --profile ${A.profilePath}` : ''}${(A.protectedOk || []).map((p) => ` --allow '${p}'`).join('')}`
+const GATE = [...(P.gate || []), PROTECT].map((c, i) => `${i + 1}. ${c}`).join('\n')
 const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
@@ -171,6 +173,7 @@ const fix = (label, phaseName, what) => run(
   `Fix round for ${NAME} run ${A.run}. Read .agent/plan.md. Fix these problems in the product code:
 ${JSON.stringify(what)}
 Never weaken an assertion, widen a timeout or delete a test to make it pass; if a test is wrong against the test contract, fix the test and say why.
+A "protected" failure means a protected file changed (the checks and config this branch is judged by): restore it from the base with git checkout ${BASE_REF} -- <file>; never edit the protected list.
 Return the files you changed. ${RULES}`,
   { label: `Fixer: ${label}`, phase: phaseName, schema: DONE, model: W })
 

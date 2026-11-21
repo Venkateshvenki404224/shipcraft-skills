@@ -56,6 +56,7 @@ When the profile is missing (or the owner says `/work setup`):
 | `rules` | every agent | files with project rules; agents follow them |
 | `review_rules` | approve, verify, UI review | project rules a finding can cite |
 | `secrets` | every agent, ship check | globs never printed, never committed |
+| `protected_paths` | gate, ship check | globs a run branch may not change: the checks it is judged by (for example `Makefile`, `scripts/check*.sh`, the structure tests, `e2e/playwright.config.*`). Always protected: `.work-profile/**`, `.github/workflows/**`. Tests are not protected; the review rules catch weakened ones |
 | `app.url`, `app.check`, `app.expect` | intake `stack`, QA, UI snap | omit `app` when there is no running app |
 | `app.start`, `app.start_minutes` | intake `stack` | run when the check fails; tell the owner how long |
 | `app.login`, `app.auth` | intake, QA, UI snap | `auth` is a storageState path pattern with `{role}` |
