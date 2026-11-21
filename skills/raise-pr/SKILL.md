@@ -34,7 +34,7 @@ change is for from the user's request.
    No "Verified:" line, no implementation notes, no "Generated with Claude Code" or session-link footer.
    Set the body with `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -f body=...`, read it back, and
    `curl -sL -o /dev/null -w "%{http_code} %{content_type}"` every image URL (must be `200 image/png`).
-7. **CI.** `gh pr checks <n> --watch`. Fix failures and push again; never merge a red PR.
+7. **CI.** Wait for the checks before any closing question: `python3 <work skill>/scripts/ci_wait.py <n>` when the `work` skill is installed, else `gh pr checks <n> --watch`. Fix failures and push again; never merge a red PR. Report the verdict per check with the PR link.
 8. **Merge only if the request asks for it.** `gh pr merge <n> --merge` once checks are green. Keep the
    branch: the screenshot URLs point at it and die when it is deleted.
 
