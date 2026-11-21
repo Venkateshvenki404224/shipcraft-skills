@@ -214,6 +214,14 @@ A single agent that dies (a network drop, an API error) is retried by the workfl
 - Log every decision the owner would have made, with the reason and any dissent, in `.agent/decisions.md`, and mark the gates `DONE` with "agents" in the summary.
 - A model that does not answer (an agent hangs or returns nothing three times): change that role's model in the args, say so in `decisions.md`, and go on.
 
+## Keep the main chat small
+
+The main chat runs the whole pipeline, and every turn re-reads all of it, so its size is the run's biggest hidden cost.
+- Workflows return a slim result: long text and long lists are cut, with a pointer to the `.agent/` file that holds them (`slim: false` in the args turns this off for one call). Never paste a whole result, a whole `.agent/` file or a whole log into the chat.
+- Every Markdown file an agent writes under `.agent/` starts with `## Summary` (3 to 5 bullets). Read that part first (`sed -n '1,/^## [^S]/p' <file>` or `head -12`), and read further only when the owner asks, or when a step needs a field that is not in the result.
+- While a workflow runs, don't poll it or read its transcripts; it reports back when it ends. Between steps, say one line per transition, like `#5: gate green → verify`.
+- Tool output you need only to check something (a test run, `git status`, CI checks): print the last lines or a count, not the whole output.
+
 ## Rules that always apply
 
 - **Reviews stay independent.** When a verifier, the UI/UX designer, QA or the CEO checks work again after a fix, give it only what the first review got (the files, the screenshots, the plan) and its own earlier findings. Never put the fixer's claims, your own measurements or the verdict you expect in its prompt ("the header now starts at x=64", "this should pass now"): a reviewer told the answer is no longer a check, and auto mode flags such prompts as undermining oversight. Let it measure and decide; if it still fails, that is the result.

@@ -62,8 +62,24 @@ const E2E_COVERED = new Set((CASES || []).filter((c) => c.kind === 'e2e').flatMa
 const UNCOVERED_UI = CASES ? UI_TICKETS.filter((t) => !E2E_COVERED.has(t.id)).map((t) => t.id) : []
 const EVALS = P.evals && P.evals.cmd ? { cmd: P.evals.cmd, paths: P.evals.paths || [] } : null
 const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
-const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
+// The result goes back into the orchestrator's context, which has to last the whole run: long strings and lists
+// are cut here. Every detail is in the .agent/ files the agents wrote (and in the workflow journal).
+const SLIM_STR = (A.slim && A.slim.chars) || 240, SLIM_LIST = (A.slim && A.slim.items) || 6
+function slim(v, depth = 0) {
+  if (A.slim === false) return v
+  if (typeof v === 'string') return v.length > SLIM_STR ? `${v.slice(0, SLIM_STR)}… (+${v.length - SLIM_STR} chars, see the .agent/ file)` : v
+  if (Array.isArray(v)) {
+    const cap = v.every((x) => typeof x === 'string' && x.length <= 120) ? 40 : SLIM_LIST
+    const kept = v.slice(0, cap).map((x) => slim(x, depth + 1))
+    return v.length > cap ? [...kept, `… +${v.length - cap} more in the .agent/ file`] : kept
+  }
+  if (v && typeof v === 'object') return depth > 4 ? '(nested; see the .agent/ file)' : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, slim(x, depth + 1)]))
+  return v
+}
+const SUMMARY_RULE = 'Every Markdown file you write under .agent/ starts with "## Summary": 3 to 5 bullets a person can skim; the detail follows.'
+const RULES0 = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
+const RULES = `${RULES0} ${SUMMARY_RULE}`
 
 // An agent that dies on an API error returns null: try it up to 3 times before giving up on that step.
 async function run(prompt, opts) {
@@ -369,4 +385,4 @@ an already green tree, PR text, test-count bookkeeping, polish. Followups never 
 (verdict, reasons, must_fix, followups). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
     { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: CEO_M })
 }
-return result
+return slim(result)
