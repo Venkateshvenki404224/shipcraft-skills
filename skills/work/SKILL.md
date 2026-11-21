@@ -73,7 +73,7 @@ Do not add CI workflows unless the owner asks. Reading an issue with `gh issue v
 
    It writes `.agent/state.json` with all 26 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
 6. **Board.** Start it now, before any agent runs (`references/board.md`):
-   - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Read its first line and give the owner the URL.
+   - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Its first line, printed at once, is `Run board: <url>` (or `Run board (already running): <url>` when a board already serves this repo); the URL is also in `.agent/board.url`. Give the owner the URL.
    - Cloud session (`CLAUDE_CODE_REMOTE` is set, or the owner cannot open localhost): write the snapshot (`--snapshot .agent/board.html`) and publish it with the Artifact tool; give the owner the link.
 7. **App.** When the profile has `app`: run `app.check`. If the result is not `app.expect`, run `app.start` (tell the owner it takes about `app.start_minutes`), then check again. Then run `app.login` so each role's saved login exists. Record the result as the `stack` step. Give the owner the app's address (`app.url`) next to the board link, every time you give the board link; the board also shows it at the top with whether it answers.
 
@@ -273,6 +273,8 @@ The main chat runs the whole pipeline, and every turn re-reads all of it, so its
 - Tool output you need only to check something (a test run, `git status`, CI checks): print the last lines or a count, not the whole output.
 
 ## Rules that always apply
+
+- **The board link is in every message to the owner** that reports progress, asks a question or ends a step: `Board: <url>` (from `.agent/board.url`, or the board's first line), and the app link next to it when there is an app. For lanes, the main checkout's board (it opens on the Lanes view). If there is no URL yet, say so and start the board; never leave the link out silently.
 
 - **Reviews stay independent.** When a verifier, the UI/UX designer, QA or the CEO checks work again after a fix, give it only what the first review got (the files, the screenshots, the plan) and its own earlier findings. Never put the fixer's claims, your own measurements or the verdict you expect in its prompt ("the header now starts at x=64", "this should pass now"): a reviewer told the answer is no longer a check, and auto mode flags such prompts as undermining oversight. Let it measure and decide; if it still fails, that is the result.
 - **No commit on a stale branch.** Before every commit (setup, ship, a fix round the owner asks for), run `python3 $S/scripts/branch_guard.py --base <base>`. `stale` means the current branch is the base, or its pull request is merged or closed, or all its commits are already in the base: run it with `--new <name>` and commit there. The one exception is `ship.mode: squash`, which commits on the base by design. `ok` with an open PR means the commit joins that PR: after pushing, rewrite the PR description so it covers every commit on the branch, not only the first ones (`gh pr edit <n> --body-file <file>`).

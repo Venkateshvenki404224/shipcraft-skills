@@ -26,6 +26,7 @@ import mimetypes
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
@@ -1296,7 +1297,17 @@ def main():
             print(f"snapshot: {args.snapshot} ({size / 1048576:.1f} MB){f', {skipped} media file(s) not embedded' if skipped else ''}")
         return
 
-    threading.Thread(target=loop, args=(project_dirs, pipelines), daemon=True).start()
+    info_path = os.path.join(SERVE, "board.json")
+    if os.path.isfile(info_path):
+        try:
+            info = json.load(open(info_path, encoding="utf-8"))
+            os.kill(int(info["pid"]), 0)
+            with socket.create_connection(("127.0.0.1", int(info["port"])), timeout=1):
+                pass
+            print(f"Run board (already running): {info['url']}  (repo {repo})", flush=True)
+            return
+        except (OSError, ValueError, KeyError):
+            pass
     handler = functools.partial(Quiet, directory=SERVE)
     srv = None
     for port in range(args.port, args.port + 21):
@@ -1307,7 +1318,12 @@ def main():
             continue
     if srv is None:
         raise SystemExit(f"ports {args.port}-{args.port + 20} are all taken")
-    print(f"Run board: http://127.0.0.1:{srv.server_address[1]}/dashboard.html  (repo {repo}; files in {SERVE})", flush=True)
+    url = f"http://127.0.0.1:{srv.server_address[1]}/dashboard.html"
+    write(info_path, json.dumps({"pid": os.getpid(), "port": srv.server_address[1], "url": url, "repo": repo}))
+    if os.path.isdir(os.path.join(repo, ".agent")):
+        write(os.path.join(repo, ".agent", "board.url"), url + "\n")
+    print(f"Run board: {url}  (repo {repo}; files in {SERVE})", flush=True)
+    threading.Thread(target=loop, args=(project_dirs, pipelines), daemon=True).start()
     srv.serve_forever()
 
 
