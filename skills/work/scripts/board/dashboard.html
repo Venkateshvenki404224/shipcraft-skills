@@ -28,12 +28,15 @@ a{color:var(--blue)}
 button{font:inherit;color:inherit}
 [hidden]{display:none!important}
 .wrap{max-width:1360px;margin:0 auto;padding:20px 16px 40px}
-header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:18px}
 .brand{display:flex;gap:12px;align-items:center;min-width:0}
 .mark{width:38px;height:38px;border-radius:10px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;flex:none;font-weight:700;font-size:14px}
-h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
+h1{font-size:19px;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sub{color:var(--muted);font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative}
+.controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:nowrap;position:relative;min-height:38px}
+.controls .live{min-width:92px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#run-btn-name{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+@media (max-width:720px){header{grid-template-columns:minmax(0,1fr)}.controls{justify-content:flex-start}.controls .live{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}.controls .tools{margin-left:auto}}
 .controls .tools{display:inline-flex;gap:6px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
 .btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
 .btn svg{flex:none}
@@ -509,6 +512,7 @@ function render() {
   document.title = `${run.running ? '● ' : waiting.length ? '◆ ' : ''}${run.name} · Run board`
   $('mark').textContent = initials(run.name)
   $('title').textContent = run.name
+  $('title').title = run.name
   $('subtitle').innerHTML = [esc(run.state), isPipeline(run) ? '/work pipeline' : 'workflow run', `started ${esc(ago(run.started))}`, `elapsed ${dur(run.elapsed)}`, money(run.cost) + ' est.']
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
   $('status-line').textContent = statusLine(run, gs)
