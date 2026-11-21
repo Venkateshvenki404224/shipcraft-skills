@@ -37,6 +37,7 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hid
 .controls .live{min-width:92px;white-space:nowrap;font-variant-numeric:tabular-nums}
 #run-btn-name{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
 .controls .tools{display:inline-flex;gap:6px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
+.btn.spend{height:32px;font-variant-numeric:tabular-nums;font-weight:600}
 .btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
 .btn svg{flex:none}
 .pop.hist-pop{width:min(860px,calc(100vw - 32px));max-height:70vh;overflow:auto}
@@ -260,6 +261,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
       <span class="live" id="status"><span class="dot"></span>connecting…</span>
       <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
       <span class="tools">
+        <button class="btn spend" id="spend-btn" data-testid="total-spend" aria-haspopup="dialog" aria-label="Total spent in this repo" title="Total spent in this repo: every run's agents plus every main chat. Click for the breakdown."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="spend-total">–</span></button>
         <button class="btn icon" id="hist-btn" data-testid="open-history" aria-haspopup="dialog" aria-expanded="false" aria-label="All runs in this repo (H)" title="All runs in this repo (H)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
         <button class="btn icon" id="openSettings" data-testid="open-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <button class="btn icon" id="toggleTheme" aria-label="Switch light or dark theme" title="Theme"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
@@ -583,8 +585,11 @@ function renderHistory() {
   const sessTotal = sess.reduce((n, x) => n + (x.cost || 0), 0)
   const sessBy = {}
   for (const x of sess) for (const [m, c] of Object.entries(x.by_model || {})) if (!String(m).startsWith('<')) sessBy[m] = (sessBy[m] || 0) + c
+  const agentTotal = runs.reduce((n, r) => n + (r.cost || 0) - (isPipeline(r) ? (r.main_cost || 0) : 0), 0)
+  const grand = agentTotal + sessTotal
+  $('spend-total').textContent = money(grand)
   const sessByTxt = Object.entries(sessBy).sort((a, b) => b[1] - a[1]).map(([m, c]) => `${cap(m)} ${money(c)}`).join(' · ')
-  const foot = `<div class="hist-foot"><div><b>Runs listed:</b> ${money(runTotal)} <span class="h">(agents plus each run's share of its main chat)</span></div><div><b>All main chats in this repo:</b> ${money(sessTotal)} <span class="h">${sess.length} session(s)${sessByTxt ? ' · ' + esc(sessByTxt) : ''}; includes talk outside runs</span></div>${sess.slice().sort((a, b) => (b.last || 0) - (a.last || 0)).map((x) => `<div class="h">· chat ${esc(x.id.slice(0, 8))}: ${x.first ? esc(new Date(x.first * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })) : ''}, ${money(x.cost)} (${esc(Object.entries(x.by_model || {}).filter(([m]) => !m.startsWith('<')).map(([m, c]) => cap(m) + ' ' + money(c)).join(' · '))})</div>`).join('')}</div>`
+  const foot = `<div class="hist-foot"><div data-testid="total-spend-line"><b>Total spent in this repo:</b> ${money(grand)} <span class="h">(agents ${money(agentTotal)} + main chats ${money(sessTotal)})</span></div><div><b>Runs listed:</b> ${money(runTotal)} <span class="h">(agents plus each run's share of its main chat)</span></div><div><b>All main chats in this repo:</b> ${money(sessTotal)} <span class="h">${sess.length} session(s)${sessByTxt ? ' · ' + esc(sessByTxt) : ''}; includes talk outside runs</span></div>${sess.slice().sort((a, b) => (b.last || 0) - (a.last || 0)).map((x) => `<div class="h">· chat ${esc(x.id.slice(0, 8))}: ${x.first ? esc(new Date(x.first * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })) : ''}, ${money(x.cost)} (${esc(Object.entries(x.by_model || {}).filter(([m]) => !m.startsWith('<')).map(([m, c]) => cap(m) + ' ' + money(c)).join(' · '))})</div>`).join('')}</div>`
   $('history').innerHTML = rows ? `<table class="hist"><tr><th>Run</th><th class="nw">Started</th><th class="nw">Time</th><th class="nw">Cost</th><th class="nw">Main chat</th><th>By model</th></tr>${rows}</table>${foot}` : '<div class="empty">No runs yet.</div>'
 }
 
@@ -906,6 +911,7 @@ function toggleHist(force) {
   if (show) { closePop(); renderHistory() }
 }
 $('hist-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleHist() })
+$('spend-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleHist() })
 $('set-scope').addEventListener('change', fillSettings)
 $('set-tier').addEventListener('change', (e) => applyTier(e.target.value))
 $('set-form').addEventListener('submit', (e) => { if (e.submitter && e.submitter.value === 'cancel') return; saveSettings(e) })
@@ -924,7 +930,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('click', (e) => {
   if (e.target.closest('a')) return
   if (!e.target.closest('#run-pop') && !$('run-pop').hidden) closePop()
-  if (!e.target.closest('#hist-pop') && !e.target.closest('#hist-btn') && !$('hist-pop').hidden) toggleHist(false)
+  if (!e.target.closest('#hist-pop') && !e.target.closest('#hist-btn') && !e.target.closest('#spend-btn') && !$('hist-pop').hidden) toggleHist(false)
   const t = (sel) => e.target.closest(sel)
   let el
   if ((el = t('[data-run]'))) return selectRun(el.dataset.run)
