@@ -57,6 +57,7 @@ When the profile is missing (or the owner says `/work setup`):
 | `review_rules` | approve, verify, UI review | project rules a finding can cite |
 | `secrets` | every agent, ship check | globs never printed, never committed |
 <<<<<<< HEAD
+<<<<<<< HEAD
 | `protected_paths` | gate, ship check | globs a run branch may not change: the checks it is judged by (for example `Makefile`, `scripts/check*.sh`, the structure tests, `e2e/playwright.config.*`). Always protected: `.work-profile/**`, `.github/workflows/**`. Tests are not protected; the review rules catch weakened ones |
 | `intake` | plan | `false` = no ACCEPT / NEEDS_INFO / REJECT decision (a cheap scope pass only); `{"comment": true}` = post NEEDS_INFO questions on the issue without asking. `models.intake` picks its model (default the approve model) |
 | `routing` | build (verify) | `{"risk": {"low": {"lenses": ["correctness"], "model": "work"}, …}, "surfaces": {"security": {"lens": "security", "model": "verify"}, …}}`. Lenses: correctness, security, ui, money, data, migration; a model is a role name (work, verify, approve, plan, cheap) or an alias. Omit it for the defaults (SKILL.md §3) |
@@ -65,6 +66,9 @@ When the profile is missing (or the owner says `/work setup`):
 =======
 | `plan` | every step (`budget.py`) | usage margins for a subscription: `stop_at_percent` (85), `buffer_minutes` (15), `week_stop_at_percent` (95), `window_minutes` (only when the status line gives no percentages). SKILL.md, Usage limits |
 >>>>>>> origin/feat/work-usage-guard
+=======
+| `issues.sync`, `issues.comments` | every stage | `sync: true` keeps the issue's `work:<stage>` label current and links the PR with `Closes #n`; `comments: false` = labels only. Ask at first setup (recommended on) |
+>>>>>>> origin/feat/work-issue-sync
 | `app.url`, `app.check`, `app.expect` | intake `stack`, QA, UI snap | omit `app` when there is no running app |
 | `app.start`, `app.start_minutes` | intake `stack` | run when the check fails; tell the owner how long |
 | `app.login`, `app.auth` | intake, QA, UI snap | `auth` is a storageState path pattern with `{role}` |

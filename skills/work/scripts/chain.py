@@ -152,6 +152,7 @@ def cmd_merge(a):
             steps.append(["gh", "pr", "ready", str(pr)])
         steps.append(["python3", os.path.join(here, "ci_wait.py"), str(pr)])
         steps.append(["gh", "pr", "merge", str(pr), "--merge", "--delete-branch"])
+        steps.append(["python3", os.path.join(here, "issue_sync.py"), "closed", str(pr)])
         print(f"PR #{pr} ({state['headRefName']} -> {state['baseRefName']}):")
         for s in steps:
             print("  $ " + " ".join(s))
