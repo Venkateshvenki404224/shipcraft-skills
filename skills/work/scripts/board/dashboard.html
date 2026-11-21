@@ -690,10 +690,17 @@ function renderTable(run, gs) {
   $('filters').innerHTML = `<button class="chip ${prefs.filter === 'all' ? 'on' : ''}" data-filter="all">All<span class="n">${scoped.length}</span></button>`
     + CATS.filter((k) => c[k]).map((k) => `<button class="chip ${prefs.filter === k ? 'on' : ''}" data-filter="${k}">${CAT_LABEL[k]}<span class="n">${c[k]}</span></button>`).join('')
   $('agentsTitle').textContent = [prefs.role || 'All steps', prefs.phase && `stage ${prefs.phase}`].filter(Boolean).join(' · ')
-  const order = { wait: 0, running: 1, issue: 2, queued: 3, done: 4, skipped: 5 }
+  const order = { wait: 0, running: 1, issue: 2, done: 3, queued: 4, skipped: 5 }
   const phases = run.phases || []
   const list = scoped.filter((g) => prefs.filter === 'all' || cat(g) === prefs.filter)
-    .sort((a, b) => order[cat(a)] - order[cat(b)] || (isPipeline(run) ? phases.indexOf(a.phase) - phases.indexOf(b.phase) : (b.started || 0) - (a.started || 0)))
+    .sort((a, b) => {
+      const byCat = order[cat(a)] - order[cat(b)]
+      if (byCat) return byCat
+      const step = isPipeline(run) ? phases.indexOf(a.phase) - phases.indexOf(b.phase) : 0
+      if (cat(a) === 'queued') return step
+      const last = (g) => g.ended || ((g.started || 0) + (g.elapsed || 0))
+      return (last(b) - last(a)) || -step
+    })
   if (!list.length) {
     const filtered = prefs.filter !== 'all' || prefs.role || prefs.phase
     $('agents').innerHTML = `<tr><td class="empty">${filtered ? 'Nothing matches these filters. <button class="chip" data-clear="1">Show all steps</button>' : 'Nothing here yet'}</td></tr>`
