@@ -30,17 +30,18 @@ After every stage: `python3 $S/scripts/state.py step <key> --status <status> --s
 | 18 | Agent QA | `qa` | one QA agent per role, in parallel, on video | `.agent/qa/<role>.json`, `.agent/video/` | the findings files are written |
 | 19 | UI + video | `ui-after` | capture + UI/UX designer review (UI reviewer when the designer is off) | `.agent/ui/{after,diff,marked}/`, `shots.json`, `review.json` | review written |
 | 20 | Agent QA | `qa-fix` | Fixer, ≤1 round | product files | QA majors and unexpected/broken shots fixed, gate green again |
-| 21 | Ship | `evidence` | Evidence | `.agent/evidence.md` | the file exists |
-| 22 | Ship | `pm-report` | PM | `.agent/pm-report.md` | every acceptance criterion has a verdict and evidence |
-| 23 | Ship | `ceo-signoff` | CEO | `.agent/ceo-signoff.md` | SHIP, or HOLD with must-fix items |
-| 24 | Ship | `h2` | **owner** (with `autonomy: agents`: CEO SHIP + green gate) | none | Ship, or "Fix then ship" |
-| 25 | Ship | `ship` | orchestrator | the commit (or PR) | ship checks pass; the push is approved |
+| 21 | Verify | `garden` | Gardener (`models.work`), when there are findings and the profile's `garden` is not false | lint rules or structure tests, the garden log | repeated patterns are checks, first sightings logged, gate green |
+| 22 | Ship | `evidence` | Evidence | `.agent/evidence.md` | the file exists |
+| 23 | Ship | `pm-report` | PM | `.agent/pm-report.md` | every acceptance criterion has a verdict and evidence |
+| 24 | Ship | `ceo-signoff` | CEO | `.agent/ceo-signoff.md` | SHIP, or HOLD with must-fix items |
+| 25 | Ship | `h2` | **owner** (with `autonomy: agents`: CEO SHIP + green gate) | none | Ship, or "Fix then ship" |
+| 26 | Ship | `ship` | orchestrator | the commit (or PR) | ship checks pass; the push is approved |
 
 Models come from the profile's `models` (`plan`, `approve`, `research`, `work`, and for the team `pm`, `ceo`, `design`, `senior`, `verify`). Record the model each alias resolved to (the board shows it per agent). Roles and their jobs: `references/team.md`.
 
 ## Gate
 
-The gate is the profile's `gate` list, run in order, all of them, then the profile's `e2e.cmd` with this feature's specs. When the project has one gate script (for example `make check` or `tools/gate.sh`), list only that. Run the full suite (`e2e.full`) at ship.
+The gate is the profile's `gate` list, run in order, all of them, then the profile's `e2e.cmd` with this feature's specs. When the project has one gate script (for example `make check` or `tools/gate.sh`), list only that. Run the full suite (`e2e.full`) at ship. When the profile has `evals`, the gate also runs `evals.cmd` if a changed file is under `evals.paths`; a failing eval makes the gate red, the same as a failing test.
 
 ## Budgets
 

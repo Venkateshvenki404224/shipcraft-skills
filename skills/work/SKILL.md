@@ -43,18 +43,18 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
 
    Add `.agent/` to `.git/info/exclude` (create the line once) so the run state can never be staged.
-4. **Branch.** Create `<branch_prefix><n>-<slug>`, or `<branch_prefix>local-<slug>` without an issue, from the profile's `base` (default `main`) in the current checkout. Do not use a worktree when the local app serves this checkout.
+4. **Branch.** Create `<branch_prefix><n>-<slug>`, or `<branch_prefix>local-<slug>` without an issue, from the profile's `base` (default `main`) in the current checkout, after `git fetch origin <base>`, starting from `origin/<base>` and never from whatever branch happens to be checked out. Do not use a worktree when the local app serves this checkout.
 5. **Manifest.** Run:
 
    ```
    python3 $S/scripts/state.py init --run <branch> --name "<title>" [--issue <n>] [--session <this session id, if known>] [--no-app] [--team-off pm,ceo,design,senior|all]
    ```
 
-   It writes `.agent/state.json` with all 25 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
+   It writes `.agent/state.json` with all 26 stages as TODO. `--no-app` marks the app stages SKIP when the profile has no `app`; `--team-off` marks the stages of the team members the profile's `team` turns off (`"team": false` = `all`). Mark `intake` DONE.
 6. **Board.** Start it now, before any agent runs (`references/board.md`):
    - Local session: `python3 $S/scripts/board/wfboard.py --repo .` with `run_in_background: true`. Read its first line and give the owner the URL.
    - Cloud session (`CLAUDE_CODE_REMOTE` is set, or the owner cannot open localhost): write the snapshot (`--snapshot .agent/board.html`) and publish it with the Artifact tool; give the owner the link.
-7. **App.** When the profile has `app`: run `app.check`. If the result is not `app.expect`, run `app.start` (tell the owner it takes about `app.start_minutes`), then check again. Then run `app.login` so each role's saved login exists. Record the result as the `stack` step.
+7. **App.** When the profile has `app`: run `app.check`. If the result is not `app.expect`, run `app.start` (tell the owner it takes about `app.start_minutes`), then check again. Then run `app.login` so each role's saved login exists. Record the result as the `stack` step. Give the owner the app's address (`app.url`) next to the board link, every time you give the board link; the board also shows it at the top with whether it answers.
 
 ## 2. Plan workflow → H1
 
@@ -90,13 +90,13 @@ It returns `{scope, prd, ceo, design, designReview, feasibility, decisions, plan
 2. **Prepare the media layers** (`references/media.md`): when `ui` is true, put the ui-snap tool in place and build the `uiSnap` command. Check `command -v agent-browser ffmpeg`; when either is missing, or the profile says `"video": false`, video is off and the evidence says why.
 3. **Write the files.** Load `workflow-authoring`. Copy `$S/workflows/build.js` to `.agent/workflow/build.js`, and write `build.args.json` with:
    - `run`, `today`, `skill` (absolute `$S`), `profile` (parsed), `profilePath`;
-   - `tickets` (verbatim from tickets.json), `roles`, `risk`, `ui`;
+   - `tickets` (verbatim from tickets.json), `testPlan` (verbatim from test-plan.json; build.js checks that every frontend and ui ticket has an end-to-end case), `roles`, `risk`, `ui`;
    - `e2e`: the profile's `e2e.cmd` with `{specs}` replaced by the plan's specs;
    - `uiSnap` (ui runs), `video`;
    - `budgets: {build: 2, qa: 1}`.
 
    The args make the generic template fit this run. Edit the copied script only when the plan needs a stage the template lacks, and note the edit in the evidence.
-4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
+4. **Run it.** Mark `tests` RUN, then `Workflow({scriptPath: ".agent/workflow/build.js", args})`. When it returns, set each stage from the result (`tests`, `red`, `ui-before`, `implement`, `gate`, `verify`, `qa`, `ui-after`, `qa-fix`, `garden`, `evidence`, `pm-report`, `ceo-signoff`), with artifacts (`.agent/qa/<role>.json`, `.agent/evidence.md`, `.agent/pm-report.md`, `.agent/ceo-signoff.md`). Read the `.agent/` files the stages wrote; never trust an agent's summary over the file it was meant to write.
 5. **When the Workflow tool is missing** (a headless run), run the same stages with the Agent tool, in the order and with the prompts in `references/stages.md`, and record each stage as it finishes so the board stays current.
 
 ## 4. Media layers
@@ -137,7 +137,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
    - Nothing from the profile's `secrets`, `.agent/`, the ui-snap copy, `test-results/` or `node_modules/` is in the diff.
    - If `ui`: `.agent/ui/review.json` exists and is newer than `.agent/ui/shots.json`.
 3. Land it by the profile's `ship.mode`:
-   - `pr` (default): commit on the branch with a feature-level message, then ask once before `git push -u origin <branch>` and `gh pr create` (title from the request; body from the evidence summary, without `.agent/` paths).
+   - `pr` (default): run `python3 $S/scripts/branch_guard.py --base <base>` first; on `stale`, run it with `--new <a new branch name>` so the commit never lands on a merged or closed branch. Then commit on the branch with a feature-level message, then ask once before `git push -u origin <branch>` and `gh pr create` (title from the request; body from the evidence summary, without `.agent/` paths).
    - `squash`: `git checkout <base> && git merge --squash <branch>`, commit with a feature-level message, then ask once before `git push origin <base>`.
 
    End the commit message with the attribution lines the session gives you.
@@ -154,6 +154,7 @@ Only when the profile says `"autonomy": "agents"`. Setup asks this on first use 
 
 ## Rules that always apply
 
+- **No commit on a stale branch.** Before every commit (setup, ship, a fix round the owner asks for), run `python3 $S/scripts/branch_guard.py --base <base>`. `stale` means the current branch is the base, or its pull request is merged or closed, or all its commits are already in the base: run it with `--new <name>` and commit there. The one exception is `ship.mode: squash`, which commits on the base by design. `ok` with an open PR means the commit joins that PR: after pushing, rewrite the PR description so it covers every commit on the branch, not only the first ones (`gh pr edit <n> --body-file <file>`).
 - **Owner gates are never skipped** in the default `"autonomy": "owner"`. Nothing is pushed without the owner's yes; with `"agents"`, only the run branch, and only with `ship.auto_push`.
 - **The board and the table stay current.** Every stage you start or finish goes through `state.py`; in a cloud session, republish the snapshot at H1, after QA and at H2.
 - **The team.** Agents are labelled "<Role>: <task>" (PM, CEO, Architect, UI/UX designer, Senior dev, Backend dev, Frontend dev, UI dev, Tester, Verifier, QA, Fixer), so the board shows who did what. Every agent call is retried up to 3 times when it returns nothing. `references/team.md` has each role's job and output.
