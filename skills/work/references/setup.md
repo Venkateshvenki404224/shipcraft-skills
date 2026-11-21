@@ -41,10 +41,9 @@ When the profile is missing (or the owner says `/work setup`):
 2. **Draft** the profile at `PROFILE_PATH` from what you found. Leave out what does not apply: no `app` for a library or CLI (no screenshots, no video; QA uses the CLI or API); no `e2e` when there is none (the gate is the test suite). Mark each value you inferred rather than found in the summary you show the owner.
 3. **Project review rules.** If `CLAUDE.md` or the docs hold rules a reviewer should enforce (access rules, naming, security patterns), copy them into `.work-profile/review-rules.md` in the shape of `assets/work-review-rules.md.example`, each with its reason, and set `review_rules`. Otherwise leave `review_rules` out.
 4. **Check the commands.** Run `app.check` and each `gate` command once. Record which pass on the base branch: a gate that is red before the feature starts must be known now, not found at H2.
-4b. **Feature map.** If the repo has a map of its screens and actions (for example `docs/features.md`), set `feature_map` to it. If it has a UI and no map, offer to write one from the routes and templates, one line per screen or action, and set `feature_map`.
 5. **The agent team.** Fill `team` from what you found: `stack` (the main framework, for example "Frappe", "Django", "Next.js"; it adds a `Senior <stack> dev`), `business` (one line: what the product sells and to whom, from the README or site), `design_system` (the folders of the project's own UI components and styles, when it has any). Leave the team on unless the owner says otherwise; `"team": false` is the lean pipeline.
 6. **Show the owner** the profile as a table (field, value, found/inferred) and ask with AskUserQuestion: "Use it" / "Change it" / "Stop". Ask also, only when you could not tell: and the ship mode (`pr`: push the branch and open a pull request; `squash`: squash onto the base branch locally, then ask before the push). **Always ask the autonomy on first setup**, with AskUserQuestion: "Owner approves (Recommended)" = `"autonomy": "owner"` (the default; you decide at H1 and H2) / "Agents decide" = `"agents"` (the agent team stands in for you at both gates). Write what the owner picks; if they skip the question, write `"owner"`. Never write `"agents"` unasked.
-7. Commit the profile on its own (`chore: add /work profile`) only when the owner says so; otherwise leave it uncommitted and use it. Before the commit, run `python3 $S/scripts/branch_guard.py --base <base>`. If it says `stale` (you are on the base branch, or the branch's pull request is merged or closed, or all its commits are already in the base), run it again with `--new <branch_prefix>work-profile` and commit there, then push that branch and open a pull request.
+7. Commit the profile on its own (`chore: add /work profile`) only when the owner says so; otherwise leave it uncommitted and use it.
 
 ## Fields
 
@@ -61,15 +60,12 @@ When the profile is missing (or the owner says `/work setup`):
 | `app.fixtures` | QA | seeds test data; QA removes what it made |
 | `roles` | plan, QA, UI snap | include `signed-out` when there is a login |
 | `gate` | gate stage, ship | run in order, all of them |
-| `evals` | gate, plan | `{"cmd": "make eval", "paths": ["evals/", "internal/ai/"]}`: the gate runs `cmd` whenever a changed file is under one of `paths` (always, when `paths` is empty), and a failing or regressed eval turns the gate red; the architect adds eval cases for every AI change. Omit when the project has no AI features |
 | `e2e.cmd` (`{specs}`), `e2e.full`, `e2e.browsers` | gate, red run, ship | browsers not run are reported NOT RUN |
 | `ui_snap.dir`, `theme_key`, `hide`, `channel` | UI layer | `dir` must be inside the e2e package so Playwright resolves; `channel: "chrome"` uses the installed Chrome |
 | `video` | QA | false to never record |
-| `garden` | gardener | `{"log": "docs/garden.md", "repeat": 2}` by default: where findings are logged and how many sightings make a check; `false` turns the gardener off |
-| `feature_map` | architect, designer, QA, UI review | path to a Markdown map of every screen, panel and action from the user's point of view (name, where it lives, how to reach it, roles). Shared names for owner and agents; plans keep it current |
 | `host`, `available_models` | setup | written by `detect_models.py`: the host and the models it offers |
 | `model_fallback` | workflows | the model any role without one uses; one of `available_models` |
-| `models` | workflows | `plan` (architect), `approve` (approver), `research` (scope, researchers), `work` (tester, developers, gate, fixer, QA, evidence). Optional: `pm`, `ceo`, `design` (fall back to `plan`), `senior`, `verify` (fall back to `approve`), and `cheap` for the mechanical stages that only run commands and report (the scope pass, gate runs, red runs, UI snap captures; falls back to `work`; a small model such as `haiku` fits). Values come from `available_models` |
+| `models` | workflows | `plan` (architect), `approve` (approver), `research` (scope, researchers), `work` (tester, developers, gate, fixer, QA, evidence). Optional: `pm`, `ceo`, `design` (fall back to `plan`), `senior`, `verify` (fall back to `approve`). Values come from `available_models` |
 | `team` | plan, build | `false` = lean pipeline; or `{pm, ceo, design, senior}` as `false` to turn one off; `senior` may be a list of reviewer names; `stack`, `business`, `design_system` (`references/team.md`) |
 | `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs") |
 | `ship.mode` | ship | `pr` (default) or `squash` |

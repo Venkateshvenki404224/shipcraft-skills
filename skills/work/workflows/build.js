@@ -11,7 +11,6 @@ export const meta = {
     { title: 'Agent QA', detail: 'one explorer per role in a real browser, recorded on video' },
     { title: 'UI after', detail: 'after screenshots, diff and the UI review (ui runs only)' },
     { title: 'Fix', detail: 'one QA fix round for QA majors and unexpected/broken UI shots' },
-    { title: 'Garden', detail: 'turns repeated findings into lint rules or structure tests; logs the rest' },
     { title: 'Evidence', detail: 'writes .agent/evidence.md for the owner (H2)' },
     { title: 'Sign-off', detail: 'PM checks every acceptance criterion; the CEO says SHIP or HOLD' },
   ],
@@ -41,7 +40,6 @@ const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))
 if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
 const W = M.work || FB
-const CHEAP = M.cheap || W
 const APPROVE_M = M.approve || FB, PLAN_M = M.plan || FB
 const VERIFY_M = M.verify || APPROVE_M
 const PM_M = M.pm || PLAN_M, CEO_M = M.ceo || PLAN_M, DESIGN_M = M.design || PLAN_M
@@ -50,13 +48,6 @@ const PM_ON = TEAM.pm !== false, CEO_ON = TEAM.ceo !== false, DESIGN_ON = TEAM.d
 const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
-const FEATURE_MAP = P.feature_map || ''
-const CASES = (A.testPlan && Array.isArray(A.testPlan.cases)) ? A.testPlan.cases : null
-const UI_TICKETS = T.filter((t) => t.kind !== 'test' && (t.role === 'frontend' || t.role === 'ui'))
-const E2E_COVERED = new Set((CASES || []).filter((c) => c.kind === 'e2e').flatMap((c) => c.covers || []))
-const UNCOVERED_UI = CASES ? UI_TICKETS.filter((t) => !E2E_COVERED.has(t.id)).map((t) => t.id) : []
-const EVALS = P.evals && P.evals.cmd ? { cmd: P.evals.cmd, paths: P.evals.paths || [] } : null
-const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
 const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
 
@@ -112,12 +103,11 @@ const UIREV = {
 }
 
 const PMREP = { type: 'object', properties: { met: { type: 'integer' }, total: { type: 'integer' }, not_met: { type: 'array', items: { type: 'string' } }, entry_point_ok: { type: 'boolean' }, summary: { type: 'string' } }, required: ['met', 'total', 'not_met', 'entry_point_ok', 'summary'] }
-const GARDEN_RES = { type: 'object', properties: { checks_added: { type: 'array', items: { type: 'object', properties: { rule: { type: 'string' }, file: { type: 'string' }, catches: { type: 'string' } }, required: ['rule', 'file', 'catches'] } }, logged: { type: 'array', items: { type: 'string' } }, skipped: { type: 'array', items: { type: 'object', properties: { finding: { type: 'string' }, why: { type: 'string' } }, required: ['finding', 'why'] } } }, required: ['checks_added', 'logged', 'skipped'] }
 const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix'] }
 
 // Who builds a ticket: tickets.json "role" (the architect sets it); "kind": "test" is always the test engineer.
 const DEV = {
-  test: { who: 'Tester', brief: 'You are the test engineer. Write the tests only, from the test contract; no product code. Cases with "kind": "property" are property-based tests (the project\'s property-testing library, or generated inputs in a loop when it has none) that check the invariant over many inputs or operation sequences. Never write a tautological test: each test must fail when the behaviour it names breaks.' },
+  test: { who: 'Tester', brief: 'You are the test engineer. Write the tests only, from the test contract; no product code.' },
   backend: { who: 'Backend dev', brief: `You are the backend developer${STACK ? ` (${STACK})` : ''}. Every endpoint and job checks who is calling and what they may do; validate input on the server; make writes idempotent where a retry or a double click can repeat them; follow how this codebase already does the same thing.` },
   frontend: { who: 'Frontend dev', brief: `You are the frontend developer. Build the pages and components to .agent/ui/design.md when it exists; reuse the project's components${DESIGN_SYSTEM.length ? ` (${DESIGN_SYSTEM.join(', ')})` : ''}; escape every output; put the test contract's hooks on the right elements; every state (empty, loading, error, no permission) works.` },
   ui: { who: 'UI dev', brief: `You are the UI developer. Follow .agent/ui/design.md exactly: layout, spacing, copy, every state, phone width 390 with no sideways scroll, dark mode, keyboard focus and screen-reader labels. Use the project's design system${DESIGN_SYSTEM.length ? ` (${DESIGN_SYSTEM.join(', ')})` : ''}; no new UI library.` },
@@ -159,10 +149,8 @@ Gate commands, in order (stop at nothing; run them all):
 ${GATE || '(the profile lists no gate commands: run the project\'s linters and unit tests as its README or CI config describes, and say which)'}
 ${E2E ? `Then the end-to-end tests: ${E2E}
 Browsers expected: ${BROWSERS.join(', ')}. Per browser report PASS n/n, FAIL, or NOT RUN with the reason (a browser that is not installed is NOT RUN, never left out).` : 'There is no end-to-end command; report browsers as {}.'}
-If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.${EVALS ? `
-AI evals: list the changed files (git diff --name-only HEAD plus untracked files). ${EVALS.paths.length ? `If any of them is under ${EVALS.paths.join(', ')}` : 'Always'}, run: ${EVALS.cmd}
-Report it as a check named "eval" with its scores; a failing or regressed eval is a failure and makes green false. When no matching file changed, report the check as "eval" with result "SKIP (no AI files changed)".` : ''}`,
-  { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: CHEAP, effort: 'low' })
+If a test fails and then passes on a rerun, rerun it 20 times; all pass = list it under flakes, any fail = failure.`,
+  { label: `Gate: ${label}`, phase: phaseName, schema: GATE_RES, model: W, effort: 'low' })
 
 const fix = (label, phaseName, what) => run(
   `Fix round for ${NAME} run ${A.run}. Read .agent/plan.md. Fix these problems in the product code:
@@ -175,10 +163,10 @@ const snapCmd = (ph) => (A.uiSnap || '').split('{phase}').join(ph)
 const uiAfter = async (tag) => {
   const cap = await run(`Run the UI after capture: ${snapCmd('after')}
 Report the counts printed by the teardown and any test that errored (an error is not a visual change). Do not change files.`,
-    { label: `UI snap: after${tag}`, phase: 'UI after', model: CHEAP, effort: 'low' })
+    { label: `UI snap: after${tag}`, phase: 'UI after', model: W, effort: 'low' })
   const designer = DESIGN_ON && A.ui
   const rev = await run(
-    `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${FEATURE_MAP ? `, the screen names in ${FEATURE_MAP}` : ''}${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
+    `You are the ${designer ? 'UI/UX designer' : 'UI review agent'} for ${NAME} run ${A.run}. Read the "expected visible changes" in .agent/plan.md${designer ? ', the design in .agent/ui/design.md (when it exists)' : ''} and .agent/ui/shots.json.
 For every shot whose status is not "unchanged", open its before, marked (the after image with a red box around each changed area) and diff
 PNGs (paths are relative to .agent/ui/; "boxes" lists the changed areas) and judge each boxed area:
 expected = the change is in the plan; unexpected = a change the plan did not ask for; broken = overlap, clipping, sideways scroll,
@@ -202,7 +190,7 @@ and what this role must NOT see or reach. Save a screenshot per finding under .a
     : `The project has no app URL: explore through its real interface (CLI, API or library calls) as the plan describes. Try bad input,
 empty input, large input, repeated calls, interrupted runs and what this role must not be able to do. Record exact commands and outputs.`
   return `You are the agent-QA explorer for role "${role}" in ${NAME} run ${A.run}.
-Read .agent/plan.md (what changed and for whom)${PM_ON ? ', .agent/prd.md (the acceptance criteria and the entry point)' : ''}${FEATURE_MAP ? `, ${FEATURE_MAP} (every screen and action by name: name things the same way in your findings, and report a screen the map lists that you cannot reach)` : ''} and .agent/test-plan.json (what the scripted tests already cover).
+Read .agent/plan.md (what changed and for whom)${PM_ON ? ', .agent/prd.md (the acceptance criteria and the entry point)' : ''} and .agent/test-plan.json (what the scripted tests already cover).
 Start where this role really starts (the home page or the signed-in landing page) and find the feature the way a user would; say if you cannot.
 ${browser}
 Rules: change only this role's own state;${APP.fixtures ? ` seed fixtures with \`${APP.fixtures}\` before and remove them after;` : ''} never print passwords or tokens;
@@ -222,23 +210,16 @@ if (A.mode === 'fixup') {
 } else {
   // ------------------------------------------------ Tests first
   phase('Tests first')
-  if (!CASES && UI_TICKETS.length) log('no testPlan in args: the UI-test coverage check did not run')
-  if (UNCOVERED_UI.length) {
-    log(`UI tickets with no end-to-end case: ${UNCOVERED_UI.join(', ')}; the tester adds them first`)
-    result.uiCoverage = await run(`These UI tickets of ${NAME} run ${A.run} have no end-to-end case in .agent/test-plan.json: ${UNCOVERED_UI.join(', ')}.
-For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket id>"] that drives the real UI as a user would (find the screen, act, see the result), using only hooks from the test contract in .agent/plan.md (add a hook to the contract when one is missing, and say so). Then write those tests. No product code. ${RULES}`,
-      { label: 'Tester: end-to-end cases for UI tickets', phase: 'Tests first', schema: DONE, model: W })
-  }
   result.tickets.push(...await runTickets(T.filter((t) => t.kind === 'test'), 'Tests first'))
   const redPrompt = `Red run for ${NAME} run ${A.run}: the feature is not implemented yet, so the new tests must FAIL, each for the right reason
 (the missing feature, not a typo, a bad locator or a broken fixture). Run the new unit/script checks${E2E ? ` and: ${E2E}` : ''}
 (no retries; keep timeouts short). Compare each failure message with .agent/test-plan.json. Do not change files.`
-  let red = await run(redPrompt, { label: 'Gate: red run', phase: 'Tests first', schema: RED, model: CHEAP, effort: 'low' })
+  let red = await run(redPrompt, { label: 'Gate: red run', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
   if (red && (red.passing_unexpectedly.length || red.wrong_reason.length)) {
     log(`red run: ${red.passing_unexpectedly.length} pass too early, ${red.wrong_reason.length} fail for the wrong reason; fixing the tests once`)
     await run(`Fix these tests so they fail only because the feature is missing (no product code): ${JSON.stringify({ passing: red.passing_unexpectedly, wrong: red.wrong_reason })}. ${RULES}`,
       { label: 'Tester: fix the red run', phase: 'Tests first', schema: DONE, model: W })
-    red = await run(redPrompt, { label: 'Gate: red run 2', phase: 'Tests first', schema: RED, model: CHEAP, effort: 'low' })
+    red = await run(redPrompt, { label: 'Gate: red run 2', phase: 'Tests first', schema: RED, model: W, effort: 'low' })
   }
   result.red = red
 
@@ -248,7 +229,7 @@ For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket i
     result.uiBefore = await run(`Run the UI before capture on the current code, before anything is implemented:
 ${snapCmd('before')}
 It reads .agent/ui/pages.json. Report the shot count and any errors. Do not change files.`,
-      { label: 'UI snap: before', phase: 'UI before', model: CHEAP, effort: 'low' })
+      { label: 'UI snap: before', phase: 'UI before', model: W, effort: 'low' })
   }
 
   // ------------------------------------------------ Implement
@@ -307,27 +288,6 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
   } else if (qaMajors.length || uiFlags.length) log('QA findings left: QA budget used up; they go to the owner')
 }
 
-const gardenFindings = [
-  ...(result.verify || []).flatMap((r) => r.findings || []).map((f) => ({ from: 'verify', ...f })),
-  ...(result.qa || []).flatMap((r) => (r.findings || []).filter((f) => !f.existing_bug).map((f) => ({ from: `qa:${r.role}`, severity: f.severity, where: f.url || '', what: f.title }))),
-  ...(((result.ui && result.ui.review && result.ui.review.flagged) || []).map((f) => ({ from: 'ui', severity: 'major', where: f.id, what: f.note }))),
-]
-if (GARDEN && gardenFindings.length) {
-  phase('Garden')
-  result.garden = await run(
-    `You are the gardener for ${NAME} run ${A.run}. Your job is the codebase's guard rails, not this feature: every mistake an agent makes should become impossible next time.
-Read ${GARDEN.log} (the garden log: earlier findings, one entry each; create it if missing) and these findings from this run:
-${JSON.stringify(gardenFindings)}
-For each finding, decide:
-- the same pattern is already in the log, or appears ${GARDEN.repeat}+ times in this run: make it a deterministic check. Prefer, in order: an API or type change that makes the mistake impossible; a lint rule; a structure test (for example a test that fails on a forbidden import). Its error message tells the next agent the root-cause fix, not a workaround. Fix every existing occurrence so the check passes. Record it under "Checks" in the log.
-- a first sighting: append it to the log (date ${A.today || ''}, pattern in one line, where, run ${A.run}) and change no code.
-- not a pattern (a one-off typo, a product decision): skip it and say why.
-Never add a code comment, a doc line or an AGENTS.md rule in place of a check. Then run the gate:
-${GATE || "(the project's linters and unit tests)"}
-It must stay green; if a new check cannot pass yet, revert that check and log it instead. ${RULES}`,
-    { label: 'Gardener: findings into checks', phase: 'Garden', schema: GARDEN_RES, model: W })
-}
-
 // ------------------------------------------------ Evidence
 phase('Evidence')
 result.evidence = await run(
@@ -336,7 +296,7 @@ ${JSON.stringify(result)}
 Sections: what was built (plain words); test results as a role x browser table with NOT RUN where a browser did not run, plus flakes by name;
 gate table; verification verdict and what was fixed; agent QA counts and open findings grouped by theme (existing bugs labelled);
 UI before/after: every non-unchanged shot with its verdict (if .agent/ui/shots.json exists); videos: every file under .agent/video/ with role
-and kind; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
+and kind; fix rounds used vs budget; stages with time; cost marked "estimated" unless measured; files touched (git status).
 Short sentences, no hype. Return the first 3 lines of the file.`,
   { label: 'Evidence: report', phase: 'Evidence', model: W })
 

@@ -19,7 +19,6 @@
   "roles": ["admin", "user", "signed-out"],
 
   "gate": ["npm run lint", "npm run typecheck", "npm test"],
-  "evals": { "cmd": "make eval", "paths": ["evals/", "src/ai/"] },
   "e2e": {
     "dir": "tests/e2e",
     "cmd": "cd tests/e2e && npx playwright test {specs} --retries=0",
@@ -28,7 +27,6 @@
   },
   "ui_snap": { "dir": "tests/e2e/ui-snap", "theme_key": null, "hide": [".cookie-banner"], "channel": null },
   "video": true,
-  "feature_map": "docs/features.md",
 
   "team": {
     "stack": "Next.js",
@@ -42,6 +40,6 @@
   "available_models": ["<written by scripts/detect_models.py>"],
   "model_fallback": "<one of available_models: used by any role with no model>",
   "models": { "plan": "<model>", "approve": "<model>", "research": "<model>", "work": "<model>",
-              "pm": "<model, optional>", "ceo": "<optional>", "design": "<optional>", "senior": "<optional>", "verify": "<optional>", "cheap": "<optional: gate runs, red runs, UI snaps, scope>" },
+              "pm": "<model, optional>", "ceo": "<optional>", "design": "<optional>", "senior": "<optional>", "verify": "<optional>" },
   "ship": { "mode": "pr", "auto_push": false }
 }

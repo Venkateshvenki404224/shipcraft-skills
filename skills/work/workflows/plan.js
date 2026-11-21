@@ -31,7 +31,7 @@ const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || 
 if (MISSING.length) throw new Error(`profile has no model for: ${MISSING.join(', ')}, and no model_fallback. Run the model setup (references/setup.md, "Models") and pass the profile again.`)
 const PLAN_M = M.plan || FB, APPROVE_M = M.approve || FB
 const MODELS = {
-  scope: M.cheap || M.research || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
+  scope: M.research || FB, research: M.research || FB, plan: PLAN_M, approve: APPROVE_M,
   verify: M.verify || APPROVE_M, pm: M.pm || PLAN_M, ceo: M.ceo || PLAN_M,
   design: M.design || PLAN_M, senior: M.senior || APPROVE_M,
 }
@@ -43,9 +43,6 @@ const STACK = TEAM.stack || P.stack || ''
 const SENIORS = TEAM.senior === false ? [] : (Array.isArray(TEAM.senior) && TEAM.senior.length ? TEAM.senior : ['Senior dev', ...(STACK ? [`Senior ${STACK} dev`] : [])])
 const BUSINESS = TEAM.business ? `\nWhat the business sells and to whom (from the profile): ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
-const FEATURE_MAP = P.feature_map || ''
-const FMAP = FEATURE_MAP ? ` and the feature map ${FEATURE_MAP} (the names of every screen, panel and action, from the user's point of view: use those names, never invent new ones)` : ''
-const EVALS = P.evals && P.evals.cmd ? P.evals : null
 const MAX_REVISIONS = 2
 
 // ---------------------------------------------------------------- helpers
@@ -156,17 +153,16 @@ phase('Plan')
 const productFiles = [PM_ON && '.agent/prd.md', CEO_ON && '.agent/ceo.md'].filter(Boolean)
 const planPrompt = (extra) => `You are the architect for ${NAME} run ${A.run} (${A.title || ''}), today ${A.today || ''}.
 Read ${ISSUE}, ${productFiles.length ? `${productFiles.join(', ')} (the product brief and the CEO's scope: honour the cuts and must-haves), ` : ''}${SKILL}/references/pipeline.md (sections "Plan check", "Test rules", "UI before / after"), the project rules (${RULES}),
-the project profile (${A.profilePath || '.work-profile/work.json'})${FMAP}, and these research reports:
+the project profile (${A.profilePath || '.work-profile/work.json'}), and these research reports:
 ${JSON.stringify(research)}
 
 Write these files (create .agent/ui/ only if ui):
 - .agent/research.md: the research above, merged and deduplicated, with evidence.
-- .agent/plan.md: goal; for anything with state (a status or lifecycle, undo/redo, balances or totals, a staged import, a multi-step flow): a statechart as a Mermaid stateDiagram from the user's point of view (every state, every transition and what triggers it, the forbidden transitions) and its invariants in one line each; a table mapping EVERY sentence of the request${PM_ON ? ' and every acceptance criterion of prd.md' : ''} to a ticket or to "out of scope"; design; the test contract (for UI: the exact data-* or role/label hooks tests will use, and which component gets each; for APIs/CLIs: the exact calls and outputs); roles affected and how each is checked; risk tier with the reason; expected visible changes, one line per page (ui only); at most 4 open questions, each with a proposed default.
+- .agent/plan.md: goal; a table mapping EVERY sentence of the request${PM_ON ? ' and every acceptance criterion of prd.md' : ''} to a ticket or to "out of scope"; design; the test contract (for UI: the exact data-* or role/label hooks tests will use, and which component gets each; for APIs/CLIs: the exact calls and outputs); roles affected and how each is checked; risk tier with the reason; expected visible changes, one line per page (ui only); at most 4 open questions, each with a proposed default.
 - .agent/tickets.json: [{"id":"T1","title":"...","kind":"test|impl|docs","role":"test|backend|frontend|ui|data|docs","files":["..."],"deps":["T0"],"acceptance":["Given/When/Then"],"model":"${M.work || FB}"}]. "role" says which developer builds it: backend (server code, APIs, jobs, permissions), frontend (pages, components, client code), ui (styles, layout, copy, design-system work), data (migrations, fixtures, seed data), docs, test. Test tickets come first and depend on nothing but fixtures. Tickets that share a file must depend on each other.
-- .agent/test-plan.json: {"cases":[{"id":"E1","kind":"unit|e2e|property|eval","title":"...","role":"...","browsers":[...],"covers":["T2"]}]}: unit/script checks and end-to-end cases, browsers from the profile's e2e.browsers, "covers" = the ids of the tickets each case tests. Every ticket with role frontend or ui, and every ticket that changes what a user sees, is covered by at least one "kind": "e2e" case that drives the real UI as a user would${P.e2e && P.e2e.cmd ? '' : ' (the profile has no e2e command: add an open question proposing the tool and command)'}; include cross-page state cases for anything that navigates and skip cases for role-gated steps. ${EVALS ? `Any ticket that adds or changes an AI prompt, model call or AI-produced output adds eval cases (golden inputs with the expected output and a scoring rule) run by \`${EVALS.cmd}\`${EVALS.paths && EVALS.paths.length ? `, under ${EVALS.paths.join(', ')}` : ''}; list them in test-plan.json with "kind": "eval". ` : ''}Every invariant in plan.md gets a property-based test ("kind": "property": generated inputs or random operation sequences that must keep the invariant, for example undo then redo returns the same state, totals always equal the sum of their rows, a rebuild equals the live data) and every statechart transition, allowed or forbidden, gets a case. No tautological tests: a test that restates the implementation, asserts only that a mock was called, or cannot fail when the behaviour breaks does not count.
+- .agent/test-plan.json: unit/script checks and end-to-end cases with ids, role, browser list (from the profile's e2e.browsers), and which ticket each covers; include cross-page state cases for anything that navigates and skip cases for role-gated steps.
 - .agent/ui/pages.json (only if ui): pages, roles, viewports, themes, hide/mask, in the format at the top of ${SKILL}/scripts/ui-snap/spec.ts.${P.ui_snap && P.ui_snap.theme_key ? ` Set "theme_key": "${P.ui_snap.theme_key}".` : ''}${P.ui_snap && P.ui_snap.hide && P.ui_snap.hide.length ? ` Default "hide": ${JSON.stringify(P.ui_snap.hide)}.` : ''}
-${FEATURE_MAP ? `When the feature adds, renames or removes a screen, panel or action, add a docs ticket that updates ${FEATURE_MAP} in the same shape (name, where it lives, how a user reaches it, which roles see it).
-` : ''}Return "specs": the test files or folder of this feature, as they go into the profile's e2e command.
+Return "specs": the test files or folder of this feature, as they go into the profile's e2e command.
 Do not write product code.${extra || ''}`
 let plan = await run(planPrompt(), { label: 'Architect: plan', phase: 'Plan', schema: PLAN, model: MODELS.plan })
 if (!plan) throw new Error('architect returned nothing')
@@ -174,7 +170,7 @@ if (!plan) throw new Error('architect returned nothing')
 // ---------------------------------------------------------------- Design (UI runs)
 if (DESIGN_ON && plan.ui) {
   phase('Design')
-  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${RULES})${FMAP}${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
+  const designPrompt = (extra) => `You are the UI/UX designer for ${NAME} run ${A.run}. Read ${ISSUE}, ${[...productFiles, '.agent/plan.md', '.agent/ui/pages.json'].join(', ')}, the project rules (${RULES})${DESIGN_SYSTEM.length ? ` and the design system: ${DESIGN_SYSTEM.join(', ')}` : ''}.
 Look at the pages the feature changes as they are today (read their templates or components; open them in a browser if the app runs${HAS_APP ? ` at ${P.app.url}` : ''}).
 Write .agent/ui/design.md, one section per page or component:
 - layout and hierarchy: what the user sees first, and the one main action;
@@ -241,15 +237,12 @@ ${JSON.stringify(feasIssues)}`), { label: 'Architect: apply decisions', phase: '
 phase('Approve')
 const checklist = `1. Every sentence of the request${PM_ON ? ' and every acceptance criterion in .agent/prd.md' : ''} maps to a ticket or an explicit "out of scope" (list unmapped ones verbatim).
 2. At most 4 open questions, each with a default${PM_ON ? ' (questions .agent/pm.md decided are closed)' : ''}.
-3. The test contract names exact hooks or calls, and test cases use only those. No test is tautological (restates the implementation, only checks a mock was called, or cannot fail).
+3. The test contract names exact hooks or calls, and test cases use only those.
 4. Each affected role has tests; navigation has cross-page state cases; role-gated steps have skip cases.
 5. Tickets touching the same file depend on each other; test tickets come before implementation; each ticket has a role.
 6. The risk tier fits (shared layout, auth, session, payment or data-migration code is at least medium).
 7. Nothing breaks the project rules in ${RULES}${P.review_rules ? ` or the BLOCKING rules in ${P.review_rules}` : ''}${CEO_ON ? ', the CEO\'s cuts and must-haves in .agent/ceo.md, or its never_claim list' : ''}.
-${plan.ui ? `8. pages.json covers every page in "expected visible changes", for the affected roles${DESIGN_ON ? '; every state in .agent/ui/design.md has a test or a screenshot' : ''}.` : '8. ui=false really means no user-visible change.'}
-9. Anything with state has a statechart and invariants in plan.md; each invariant has a property-based test and each transition (allowed and forbidden) has a case.${FEATURE_MAP ? `
-10. Screens and actions use the names in ${FEATURE_MAP}; a new or changed screen has a ticket that updates it.` : ''}
-11. Every frontend or ui ticket, and every ticket that changes what a user sees, is in the "covers" of at least one "kind": "e2e" case in test-plan.json.`
+${plan.ui ? `8. pages.json covers every page in "expected visible changes", for the affected roles${DESIGN_ON ? '; every state in .agent/ui/design.md has a test or a screenshot' : ''}.` : '8. ui=false really means no user-visible change.'}`
 const files = [ISSUE, ...productFiles, '.agent/plan.md', '.agent/tickets.json', '.agent/test-plan.json', ...(plan.ui ? ['.agent/ui/pages.json'] : []), ...(plan.ui && DESIGN_ON ? ['.agent/ui/design.md'] : []), ...(PM_ON ? ['.agent/pm.md'] : [])]
 let approval = null, verifier = null
 for (let round = 0; round <= MAX_REVISIONS; round++) {

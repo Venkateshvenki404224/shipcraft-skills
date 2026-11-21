@@ -40,4 +40,4 @@ If the Artifact tool is not available, say so, and point the owner at `.agent/ev
 
 ## The stage table
 
-`python3 $S/scripts/state.py show` prints the run's 26 stages as a markdown table (status, phase, step, summary). Print it in chat at H1, at H2, and for `/work status`, so the owner has the table even without the board.
+`python3 $S/scripts/state.py show` prints the run's 25 stages as a markdown table (status, phase, step, summary). Print it in chat at H1, at H2, and for `/work status`, so the owner has the table even without the board.
