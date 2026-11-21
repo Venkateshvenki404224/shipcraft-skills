@@ -56,6 +56,8 @@ When the profile is missing (or the owner says `/work setup`):
 | `rules` | every agent | files with project rules; agents follow them |
 | `review_rules` | approve, verify, UI review | project rules a finding can cite |
 | `secrets` | every agent, ship check | globs never printed, never committed |
+| `intake` | plan | `false` = no ACCEPT / NEEDS_INFO / REJECT decision (a cheap scope pass only); `{"comment": true}` = post NEEDS_INFO questions on the issue without asking. `models.intake` picks its model (default the approve model) |
+| `routing` | build (verify) | `{"risk": {"low": {"lenses": ["correctness"], "model": "work"}, …}, "surfaces": {"security": {"lens": "security", "model": "verify"}, …}}`. Lenses: correctness, security, ui, money, data, migration; a model is a role name (work, verify, approve, plan, cheap) or an alias. Omit it for the defaults (SKILL.md §3) |
 | `app.url`, `app.check`, `app.expect` | intake `stack`, QA, UI snap | omit `app` when there is no running app |
 | `app.start`, `app.start_minutes` | intake `stack` | run when the check fails; tell the owner how long |
 | `app.login`, `app.auth` | intake, QA, UI snap | `auth` is a storageState path pattern with `{role}` |
