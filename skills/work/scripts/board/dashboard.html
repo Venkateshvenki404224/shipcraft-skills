@@ -278,6 +278,13 @@ html.embed,body.embed{scrollbar-width:none}
 body.embed::-webkit-scrollbar,html.embed::-webkit-scrollbar{display:none}
 @media (max-width:720px){.split-grid{grid-template-columns:1fr!important;grid-template-rows:none!important;height:auto}.split-pane{height:70vh}}
 
+
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+*::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+*::-webkit-scrollbar-corner{background:transparent}
 </style>
 </head>
 <body>

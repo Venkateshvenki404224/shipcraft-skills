@@ -529,8 +529,9 @@ def find_runs(project_dirs):
 
 STALE = 900  # a running agent with no transcript write for this long is flagged
 
+LANE_PREFIX = re.compile(r"^lane [^ ]+ · ")
 STEP_RULES = [
-    ("research", r"^(Scope|Researcher):"),
+    ("research", r"^(Scope|Researcher|Intake):"),
     ("prd", r"^PM: product brief"),
     ("ceo-scope", r"^CEO: scope"),
     ("plan", r"^Architect: plan"),
@@ -552,8 +553,9 @@ PHASE_STEP = {"Implement": "implement", "Gate + E2E": "gate", "Verify": "verify"
 
 
 def step_of(label, phase):
+    label = LANE_PREFIX.sub("", label or "")
     for key, rx in STEP_RULES:
-        if re.search(rx, label or ""):
+        if re.search(rx, label):
             return key
     return PHASE_STEP.get(phase)
 
@@ -599,7 +601,7 @@ def workflow_agents(wf_runs, run_name, ids=()):
             for a in g.get("agents", []):
                 key = step_of(a.get("label"), g.get("phase"))
                 if key and not str(a.get("id", "")).startswith("ticket-"):
-                    role = (a.get("label") or "").split(":")[0].strip() or "Agent"
+                    role = LANE_PREFIX.sub("", a.get("label") or "").split(":")[0].strip() or "Agent"
                     linked.setdefault(key, []).append(dict(a, run=r["id"], step=role))
     return linked
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
