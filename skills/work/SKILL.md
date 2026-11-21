@@ -42,7 +42,7 @@ Do not post to GitHub issues or add CI workflows unless the owner asks. Reading 
 1. **Check the base.**
    - `git status` must show no tracked changes, or only this run's changes.
    - Check `.agent/`. If it belongs to another unfinished run (`state.json` with `"finished": false` and another `run`), stop and ask. Never delete another run's state.
-2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.agent/profile.json` (a lane's own profile, written by `lanes.py`), `.work-profile/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost.
+2. **Profile.** Resolve `PROFILE_PATH` (`references/setup.md`, "Where the profile lives": invocation path, `WORK_PROFILE`, `.agent/profile.json` (a lane's own profile, written by `lanes.py`), `.work-profile/work.json`). Do not ask where to save it; tell the owner the path. Read it. If it is missing, run the first-run setup now and get the owner's OK before you go on. Then check the models: if `plan`, `approve`, `research` or `work` has no value and there is no `model_fallback`, run `scripts/detect_models.py` and confirm the models with the owner ("Models" in setup.md). Never guess the gate, the app URL, the roles or the models: a run without a profile is the run that gets lost. Then run `python3 $S/scripts/budget.py --need 30` and tell the owner its line: the plan's usage and when it resets (§ Usage limits).
 3. **Write the request into `.agent/issue.md`.**
    - From an issue: `gh issue view <n> --json number,title,body,labels,comments,author`. Quote the title, body and comments verbatim under headings.
    - From free text: write the text verbatim, plus what you inferred (roles, pages, risk) marked as inferred.
@@ -190,10 +190,20 @@ For issues that do not depend on each other (no shared files, neither needs the 
 2. Tell the owner to open one Claude Code session per lane folder (the plugin must be installed at user scope, or the lane copies `.claude/settings.local.json`) and run `/work <n>` in each. Each lane has its own board, dev server and `.agent/`, so they run side by side.
 3. `lanes.py list` shows the lanes; `lanes.py remove <n>` removes a lane once its branch is pushed.
 
+## Usage limits: pause before the plan runs out
+
+A subscription (Claude Pro or Max, or a Codex plan) has a 5-hour window and a weekly one. A run cut off mid-workflow loses the agents in flight; a run that pauses between steps loses nothing.
+
+- **The numbers.** Claude Code gives its status line the windows' `used_percentage` and `resets_at`. `scripts/usage_tap.py`, set as the status line, saves them to `~/.claude/work-usage.json` and prints a short line (or passes the input on to the owner's own status line command in `WORK_STATUSLINE_NEXT`). At first setup, offer to install it in `~/.claude/settings.json` (`"statusLine": {"type": "command", "command": "python3 <$S>/scripts/usage_tap.py"}`), and do it only with the owner's OK. Without it, `budget.py` estimates the window from the session transcripts, without a percentage.
+- **The check.** Before every workflow (plan, build, fixup, resume) and before each chain or lane issue, run `python3 $S/scripts/budget.py --need <minutes>`: the work type's minutes for a new issue (`worktype.py show <type>`), about a third of that for a single workflow. `ok` = go on. `stop` (exit 3): do not start it. Mark the next stage WAIT with the summary "paused for the usage limit; resumes after <time>", log it in `.agent/decisions.md`, and tell the owner in two lines: what is done, the reset time, and that `/work resume` (or "continue") picks it up.
+- **The profile's `plan`** sets the margins: `stop_at_percent` (default 85), `buffer_minutes` (default 15: the check stops when the next step would leave less than this much room), `week_stop_at_percent` (default 95), and `window_minutes` for a plan without percentages (for example `285` to stop after 4 h 45 min of a 5-hour window).
+- If the limit is hit anyway, Claude Code waits for the reset and continues on its own; a workflow resumes from its cached agents. Treat it like a network drop after that: `/work resume`.
+
 ## Recovery: `/work resume`
 
 A single agent that dies (a network drop, an API error) is retried by the workflow up to 3 times, and the board says "Recovered". When the whole workflow stops, the board says "Stopped" or "Stalled" (no agent has written anything for 15 minutes) with the reason. Then:
 
+0. When the stop was a network error (`ENOTFOUND`, `ECONNRESET`, connection refused or timed out, most agents failing at once), run `python3 $S/scripts/netwait.py` first: it waits up to 30 minutes for the API to answer. Resume only after it prints `up`; if it gives up, stop and tell the owner. A verdict written while the network was down (a red gate, a HOLD) is not a real verdict: resume, don't count it.
 1. Read the recorded run: `python3 $S/scripts/state.py show` prints `workflow plan|build: <runId> (<script>)`.
 2. If that run is still listed as running in this session, stop it first (TaskStop), so two copies do not edit the same files.
 3. Resume it in this session: `Workflow({scriptPath: <script>, resumeFromRunId: <runId>, args: <the JSON in its args file>})`. Every agent that finished returns its cached result at once; only the failed and unstarted ones run again. Record the new run id with `state.py workflow`.

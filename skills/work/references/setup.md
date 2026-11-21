@@ -56,6 +56,7 @@ When the profile is missing (or the owner says `/work setup`):
 | `rules` | every agent | files with project rules; agents follow them |
 | `review_rules` | approve, verify, UI review | project rules a finding can cite |
 | `secrets` | every agent, ship check | globs never printed, never committed |
+| `plan` | every step (`budget.py`) | usage margins for a subscription: `stop_at_percent` (85), `buffer_minutes` (15), `week_stop_at_percent` (95), `window_minutes` (only when the status line gives no percentages). SKILL.md, Usage limits |
 | `app.url`, `app.check`, `app.expect` | intake `stack`, QA, UI snap | omit `app` when there is no running app |
 | `app.start`, `app.start_minutes` | intake `stack` | run when the check fails; tell the owner how long |
 | `app.login`, `app.auth` | intake, QA, UI snap | `auth` is a storageState path pattern with `{role}` |
