@@ -116,7 +116,7 @@ const UIREV = {
 
 const PMREP = { type: 'object', properties: { met: { type: 'integer' }, total: { type: 'integer' }, not_met: { type: 'array', items: { type: 'string' } }, entry_point_ok: { type: 'boolean' }, summary: { type: 'string' } }, required: ['met', 'total', 'not_met', 'entry_point_ok', 'summary'] }
 const GARDEN_RES = { type: 'object', properties: { checks_added: { type: 'array', items: { type: 'object', properties: { rule: { type: 'string' }, file: { type: 'string' }, catches: { type: 'string' } }, required: ['rule', 'file', 'catches'] } }, logged: { type: 'array', items: { type: 'string' } }, skipped: { type: 'array', items: { type: 'object', properties: { finding: { type: 'string' }, why: { type: 'string' } }, required: ['finding', 'why'] } } }, required: ['checks_added', 'logged', 'skipped'] }
-const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix'] }
+const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } }, followups: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix', 'followups'] }
 
 // Who builds a ticket: tickets.json "role" (the architect sets it); "kind": "test" is always the test engineer.
 const DEV = {
@@ -360,7 +360,10 @@ if (CEO_ON) {
     `You are the CEO of ${NAME}.${BUSINESS} Decide whether run ${A.run} is ready to ship.
 Read .agent/ceo.md (your scope, must-haves and never-claim list)${PM_ON ? ', .agent/pm-report.md' : ''}, .agent/evidence.md and .agent/qa/*.json.
 SHIP when the must-haves are in, the gate is green, nothing blocker or major is open and nothing in the product promises what it does not do. Otherwise HOLD,
-with must_fix: the exact items to fix before it ships. Write .agent/ceo-signoff.md (verdict, reasons, must_fix). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
+with must_fix: only blockers, the exact items a user or the owner would be hurt by if this shipped (a red gate, an unmet must-have, a bug, a security hole, data loss,
+the product promising what it does not do). Put everything else in followups, not must_fix: docs wording, screenshots to retake, a re-run of QA or a review on
+an already green tree, PR text, test-count bookkeeping, polish. Followups never make a HOLD: with an empty must_fix the verdict is SHIP. Write .agent/ceo-signoff.md
+(verdict, reasons, must_fix, followups). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
     { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: CEO_M })
 }
 return result
