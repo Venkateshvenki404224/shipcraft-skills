@@ -26,6 +26,7 @@ import mimetypes
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
@@ -109,7 +110,7 @@ def parse_agent(path):
     if hit and hit[0] == sig:
         return hit[1]
     info = {"model": None, "first": None, "last": None, "cost": 0.0,
-            "tokens_out": 0, "tokens_in": 0, "events": [], "prompt": None}
+            "tokens_out": 0, "tokens_in": 0, "events": [], "prompt": None, "series": []}
     seen_req = set()
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -145,7 +146,9 @@ def parse_agent(path):
                     inp = u.get("input_tokens", 0) or 0
                     out = u.get("output_tokens", 0) or 0
                     cr = u.get("cache_read_input_tokens", 0) or 0
-                    info["cost"] += (inp * p[0] + out * p[1] + w5 * p[2] + w1 * p[3] + cr * p[4]) / 1e6
+                    c = (inp * p[0] + out * p[1] + w5 * p[2] + w1 * p[3] + cr * p[4]) / 1e6
+                    info["cost"] += c
+                    info["series"].append((t, c, short_model(info["model"])))
                     info["tokens_out"] += out
                     info["tokens_in"] += inp + w5 + w1 + cr
                 for b in msg.get("content") or []:
@@ -225,7 +228,28 @@ def verdict(result):
         for k in ("approved", "pass"):
             if isinstance(result.get(k), bool):
                 return "PASS" if result[k] else "CHANGES"
+        if isinstance(result.get("green"), bool):
+            return "PASS" if result["green"] else "FAIL"
     return "DONE"
+
+
+def verdict_line(result):
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except Exception:
+            return result
+    if not isinstance(result, dict):
+        return str(result)
+    fails = result.get("failures") or result.get("must_fix") or result.get("findings") or []
+    head = result.get("summary") or result.get("verdict") or ""
+    def item(f):
+        if isinstance(f, str):
+            return f
+        what = f.get("what") or f.get("title") or f.get("check") or f.get("name") or json.dumps(f)
+        return f"{f['where']}: {what}" if f.get("where") else what
+    items = "\n".join(f"- {one_line(item(f), 200)}" for f in fails[:5]) + (f"\n- … and {len(fails) - 5} more below" if len(fails) > 5 else "") if isinstance(fails, list) and fails else ""
+    return "\n\n".join(x for x in [head, f"Failed:\n{items}" if items else ""] if x) or "see the result below"
 
 
 # ---------------------------------------------------------------- runs
@@ -363,7 +387,17 @@ def export_run(run_dir, now):
                     tickets[t["id"]] = t
 
         adir = os.path.join(base, "agents", aid)
-        write(os.path.join(adir, "result.md"), to_md(a["result"]) if a["done"] else "_Still running._")
+        if not a["done"]:
+            res_md = "_Still running._"
+        elif a["result"] is None:
+            tail = "\n".join(f"- {tool}: {one_line(str(detail), 160)}" for _, tool, detail in info["events"][-8:]) or "- (no tool calls recorded)"
+            why = wf_error if wf_error else ("it was retried; see the retry below" if retried else "the agent ended without a report (an API or network error, or it was stopped)")
+            res_md = f"## What happened\n\n**{status}:** {why}.\n\n## Its last steps\n\n{tail}\n\nFull transcript: `{apath}`"
+        else:
+            res_md = to_md(a["result"])
+            if status in ("FAIL", "CHANGES"):
+                res_md = f"## What happened\n\n**{status}:** {verdict_line(a['result'])}\n\nFull transcript: `{apath}`\n\n---\n\n" + res_md
+        write(os.path.join(adir, "result.md"), res_md)
         ev = info["events"][-MAX_EVENTS:]
         act = [f"# Activity · {a['label']}", "",
                f"Model `{short_model(info['model'])}` · {info['tokens_out']:,} output tokens · ${info['cost']:.2f}", ""]
@@ -495,8 +529,9 @@ def find_runs(project_dirs):
 
 STALE = 900  # a running agent with no transcript write for this long is flagged
 
+LANE_PREFIX = re.compile(r"^lane [^ ]+ · ")
 STEP_RULES = [
-    ("research", r"^(Scope|Researcher):"),
+    ("research", r"^(Scope|Researcher|Intake):"),
     ("prd", r"^PM: product brief"),
     ("ceo-scope", r"^CEO: scope"),
     ("plan", r"^Architect: plan"),
@@ -518,8 +553,9 @@ PHASE_STEP = {"Implement": "implement", "Gate + E2E": "gate", "Verify": "verify"
 
 
 def step_of(label, phase):
+    label = LANE_PREFIX.sub("", label or "")
     for key, rx in STEP_RULES:
-        if re.search(rx, label or ""):
+        if re.search(rx, label):
             return key
     return PHASE_STEP.get(phase)
 
@@ -565,7 +601,7 @@ def workflow_agents(wf_runs, run_name, ids=()):
             for a in g.get("agents", []):
                 key = step_of(a.get("label"), g.get("phase"))
                 if key and not str(a.get("id", "")).startswith("ticket-"):
-                    role = (a.get("label") or "").split(":")[0].strip() or "Agent"
+                    role = LANE_PREFIX.sub("", a.get("label") or "").split(":")[0].strip() or "Agent"
                     linked.setdefault(key, []).append(dict(a, run=r["id"], step=role))
     return linked
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
@@ -687,7 +723,7 @@ _app_seen = {}
 
 
 def app_info(root, now):
-    paths = [os.environ.get("WORK_PROFILE") or "", os.path.join(root, ".work-profile", "work.json"), os.path.join(root, ".claude", "work.json")]
+    paths = [os.environ.get("WORK_PROFILE") or "", os.path.join(root, ".agent", "profile.json"), os.path.join(root, ".work-profile", "work.json"), os.path.join(root, ".claude", "work.json")]
     prof = next((p for p in paths if p and os.path.isfile(p if os.path.isabs(p) else os.path.join(root, p))), None)
     if not prof:
         return None
@@ -786,7 +822,13 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
             sid = f"step-{re.sub(r'[^A-Za-z0-9_-]+', '-', key)}"
             detail = s.get("detail") or ""
             detail = "\n".join(detail) if isinstance(detail, list) else str(detail)
-            write(os.path.join(base, "agents", sid, "result.md"), f"# {s.get('title') or key}\n\n{detail or '_Nothing recorded yet._'}")
+            summ = s.get("summary") or ""
+            body = "\n\n".join(x for x in [f"**{status}:** {summ}" if summ else "", detail] if x)
+            if not body:
+                body = "_Nothing recorded yet._" if status in ("TODO", "RUN") else f"**{status}**, with no summary. The orchestrator records why with `state.py step {key} --summary`; the run's notes are in `.agent/decisions.md` and `.agent/evidence.md`."
+            if status in ("FAIL", "STOPPED") and mine:
+                body += "\n\nEach agent's own result and full log is in this pipeline's workflow runs (" + ", ".join(f"`{r.get('id')}`" for r in mine) + "): pick one in the Runs menu (R)."
+            write(os.path.join(base, "agents", sid, "result.md"), f"# {s.get('title') or key}\n\n{body}")
             write(os.path.join(base, "agents", sid, "activity.md"), f"_No agent: this step is done by the {s.get('who') or 'orchestrator'}._")
             write(os.path.join(base, "agents", sid, "prompt.md"), "_No prompt._")
             n_running += status == "RUN"
@@ -816,6 +858,11 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     spath = next((p for d in project_dirs for p in [os.path.join(d, f"{sess}.jsonl")] if os.path.isfile(p)), None) if sess else None
     if spath:
         info = parse_agent(spath)
+        t0 = m.get("started_at") or first
+        t1 = m.get("finished_at") or (None if not finished else last)
+        win = [c for (t, c, _m) in info["series"] if t and (t0 is None or t >= t0 - 60) and (t1 is None or t <= t1 + 60)]
+        main_cost = round(sum(win), 4) if t0 else info["cost"]
+        info = dict(info, cost=main_cost)
         total_cost += info["cost"]
         groups.insert(0, {"id": "Orchestrator/main", "phase": m.get("phases", ["Orchestrator"])[0], "key": "main",
                           "agents": [{"id": f"session-{sess[:8]}", "label": "orchestrator", "step": "main",
@@ -843,12 +890,44 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
     return {"id": run_id, "name": m.get("name") or m.get("run") or run_id, "state": state, "events": [],
             "phases": cols, "groups": groups, "artifacts": arts, "agents": n_agents, "running": n_running,
             "app": app_info(root, now),
+            "main_cost": round(info["cost"], 4) if spath else 0.0,
             "problem": problem,
             "ui": export_ui(root, base, run_id),
             "videos": export_video(root, base, run_id),
             "cost": round(total_cost, 2), "started": first, "updated": last,
             "elapsed": ((now if not finished else (last or now)) - first) if first else 0,
             "_mtime": os.path.getmtime(manifest)}
+
+
+def lane_dirs():
+    if not REPO:
+        return []
+    r = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True, cwd=REPO)
+    out = []
+    for block in r.stdout.split("\n\n"):
+        m = re.search(r"^worktree (.+)$", block, re.M)
+        if m and os.path.realpath(m.group(1)) != os.path.realpath(REPO) and os.path.isfile(os.path.join(m.group(1), ".agent", "lane.json")):
+            out.append(m.group(1))
+    return out
+
+
+def lanes_cap():
+    prof, over = settings_paths()
+    cap = None
+    if over and os.path.isfile(over):
+        cap = (json.load(open(over, encoding="utf-8")).get("lanes") or {}).get("concurrency")
+    if cap is None and prof:
+        cap = (json.load(open(prof, encoding="utf-8")).get("lanes") or {}).get("concurrency")
+    return int(cap or 3)
+
+
+def usage_now():
+    p = os.path.expanduser(os.environ.get("WORK_USAGE_FILE", "~/.claude/work-usage.json"))
+    if not os.path.isfile(p):
+        return None
+    d = json.load(open(p, encoding="utf-8"))
+    rl = d.get("rate_limits") or {}
+    return {"at": d.get("at"), "five_hour": rl.get("five_hour"), "seven_day": rl.get("seven_day")}
 
 
 def export_once(project_dirs, pipeline_globs):
@@ -870,11 +949,60 @@ def export_once(project_dirs, pipeline_globs):
                 runs.append({"id": "pl_" + os.path.basename(os.path.dirname(os.path.dirname(p))), "name": p, "state": "error",
                              "error": f"{p}: {e}", "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0,
                              "cost": 0, "elapsed": 0})
+        lanes = []
+        for d in lane_dirs():
+            meta = json.load(open(os.path.join(d, ".agent", "lane.json"), encoding="utf-8"))
+            sp = os.path.join(d, ".agent", "state.json")
+            run = None
+            if os.path.isfile(sp):
+                try:
+                    run = export_pipeline(sp, project_dirs, now, wf_runs)
+                    run["id"] = f"pl_lane-{meta.get('issue')}"
+                    run["lane"] = str(meta.get("issue"))
+                    runs.append(run)
+                except Exception as e:
+                    run = {"id": f"pl_lane-{meta.get('issue')}", "name": f"lane {meta.get('issue')}", "state": "error", "error": str(e),
+                           "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0, "cost": 0, "elapsed": 0, "lane": str(meta.get("issue"))}
+                    runs.append(run)
+            q = os.path.join(d, ".agent", "question.md")
+            groups = (run or {}).get("groups") or []
+            lanes.append({"lane": str(meta.get("issue")), "run_id": (run or {}).get("id"), "dir": d, "branch": meta.get("branch"),
+                          "ports": meta.get("ports"), "app_url": ((meta.get("ports") or {}).get("port") and f"http://localhost:{meta['ports']['port']}"),
+                          "name": (run or {}).get("name") or f"lane {meta.get('issue')}", "state": (run or {}).get("state") or "not started",
+                          "done": sum(1 for g in groups if g.get("status") in ("DONE", "SKIP", "PASS")), "total": len(groups),
+                          "cost": (run or {}).get("cost") or 0, "elapsed": (run or {}).get("elapsed") or 0,
+                          "current": next((g.get("title") for g in groups if g.get("status") in ("RUN", "WAIT", "FAIL")), ""),
+                          "question": open(q, encoding="utf-8").read().strip()[:400] if os.path.isfile(q) else ""})
+        seen, uniq = set(), []
+        for r in runs:
+            if r["id"] in seen:
+                continue
+            seen.add(r["id"])
+            uniq.append(r)
+        runs = uniq
         runs.extend(wf_runs)
+        for r in runs:
+            by = {}
+            for g in r.get("groups", []):
+                for a in g.get("agents", []):
+                    m = a.get("model")
+                    if m and not str(m).startswith("<") and a.get("cost"):
+                        by[m] = round(by.get(m, 0) + a["cost"], 4)
+            r["cost_by_model"] = by
         for r in runs:
             r.pop("_prompt_head", None)
             r.pop("_args_run", None)
-        state = {"generated": now, "project": project_dirs, "runs": runs}
+        sessions = []
+        for d in project_dirs:
+            for sp in glob.glob(os.path.join(d, "*.jsonl")):
+                si = parse_agent(sp)
+                if si["cost"]:
+                    by = {}
+                    for (_t, c, mdl) in si["series"]:
+                        by[mdl] = round(by.get(mdl, 0) + c, 4)
+                    sessions.append({"id": os.path.basename(sp)[:-6], "cost": round(si["cost"], 4), "first": si["first"], "last": si["last"], "by_model": by})
+        state = {"generated": now, "project": project_dirs, "runs": runs, "sessions": sessions,
+                 "lanes": sorted(lanes, key=lambda x: int(x["lane"]) if str(x["lane"]).isdigit() else 0), "lanes_cap": lanes_cap(), "usage": usage_now()}
     except Exception as e:
         state = {"generated": now, "error": str(e), "runs": []}
     write(os.path.join(OUT, "state.json"), json.dumps(state))
@@ -984,9 +1112,149 @@ def project_dirs_for(repo, cwd):
     return out
 
 
+REPO = None
+MODEL_KEYS = ("plan", "approve", "research", "work", "pm", "ceo", "design", "senior", "verify", "cheap")
+STAGE_KEYS = ("video", "qa", "ui_shots", "garden")
+TEAM_KEYS = ("pm", "ceo", "design", "senior")
+
+
+def settings_paths():
+    env = os.environ.get("WORK_PROFILE")
+    cands = [env if env and os.path.isabs(env) else (os.path.join(REPO, env) if env else None),
+             os.path.join(REPO, ".work-profile", "work.json"), os.path.join(REPO, ".claude", "work.json")]
+    prof = next((p for p in cands if p and os.path.isfile(p)), None)
+    return prof, os.path.join(REPO, ".agent", "overrides.json")
+
+
+def read_settings():
+    prof_path, over_path = settings_paths()
+    prof = json.load(open(prof_path, encoding="utf-8")) if prof_path else {}
+    over = json.load(open(over_path, encoding="utf-8")) if os.path.isfile(over_path) else {}
+    team = prof.get("team") if isinstance(prof.get("team"), dict) else ({} if prof.get("team") is not False else {k: False for k in TEAM_KEYS})
+    view = lambda src, t: {
+        "models": {k: (src.get("models") or {}).get(k) for k in MODEL_KEYS},
+        "stages": {"video": src.get("video", True) is not False, "qa": src.get("qa", True) is not False,
+                   "ui_shots": src.get("ui_shots", True) is not False, "garden": src.get("garden", True) is not False},
+        "team": {k: (t or {}).get(k, True) is not False for k in TEAM_KEYS}}
+    return {"profile_path": os.path.relpath(prof_path, REPO) if prof_path else None,
+            "tier": {"repo": prof.get("tier") or "balanced", "run": over.get("tier")},
+            "knobs": {"repo": prof.get("knobs") or {}, "run": over.get("knobs") or {}},
+            "merge": {"repo": (prof.get("ship") or {}).get("merge") or "owner", "run": over.get("merge")},
+            "lanes_cap": {"repo": (prof.get("lanes") or {}).get("concurrency") or 3, "run": (over.get("lanes") or {}).get("concurrency")},
+            "available_models": prof.get("available_models") or ["opus", "sonnet", "haiku", "fable"],
+            "model_fallback": prof.get("model_fallback"),
+            "repo": view(prof, team), "run": over}
+
+
+def apply_settings(scope, body):
+    prof_path, over_path = settings_paths()
+    if scope == "repo":
+        if not prof_path:
+            raise ValueError("no profile to update")
+        target_path = prof_path
+        target = json.load(open(prof_path, encoding="utf-8"))
+    elif scope == "run":
+        target_path = over_path
+        target = json.load(open(over_path, encoding="utf-8")) if os.path.isfile(over_path) else {}
+    else:
+        raise ValueError("scope must be repo or run")
+    allowed = set(read_settings()["available_models"])
+    if "tier" in body:
+        if body["tier"] not in ("lean", "balanced", "max"):
+            raise ValueError("tier must be lean, balanced or max")
+        target["tier"] = body["tier"]
+    if "knobs" in body:
+        kn, out = body["knobs"] or {}, {}
+        checks = {"revisions": range(0, 4), "areas": range(1, 7), "outside": range(0, 5)}
+        for k, rng in checks.items():
+            if kn.get(k) not in (None, ""):
+                if int(kn[k]) not in rng:
+                    raise ValueError(f"{k} out of range")
+                out[k] = int(kn[k])
+        for k, opts in {"design_review": ("on", "off"), "seniors": ("none", "one", "all")}.items():
+            if kn.get(k) not in (None, "", "auto"):
+                if kn[k] not in opts:
+                    raise ValueError(f"bad {k}")
+                out[k] = kn[k]
+        eff = {r: v for r, v in (kn.get("effort") or {}).items() if v not in (None, "", "auto")}
+        for r, v in eff.items():
+            if r not in ("research", "pm", "ceo", "design", "plan", "review", "senior") or v not in ("low", "medium", "high"):
+                raise ValueError(f"bad effort {r}={v}")
+        if eff:
+            out["effort"] = eff
+        target["knobs"] = out
+    for k, v in (body.get("models") or {}).items():
+        if k not in MODEL_KEYS:
+            raise ValueError(f"unknown model key {k}")
+        if v in (None, ""):
+            (target.get("models") or {}).pop(k, None)
+        elif v in allowed:
+            target.setdefault("models", {})[k] = v
+        else:
+            raise ValueError(f"{v} is not one of the available models")
+    for k, v in (body.get("stages") or {}).items():
+        if k not in STAGE_KEYS or not isinstance(v, bool):
+            raise ValueError(f"bad stage setting {k}")
+        if k == "garden" and v and isinstance(target.get("garden"), dict):
+            continue
+        target[k] = v if k != "garden" or not v else {"log": "docs/garden.md", "repeat": 2}
+    if body.get("lanes_concurrency") not in (None, ""):
+        n = int(body["lanes_concurrency"])
+        if n not in range(1, 5):
+            raise ValueError("lanes at once must be 1 to 4")
+        target.setdefault("lanes", {})["concurrency"] = n
+    if "merge" in body:
+        if body["merge"] not in ("auto", "owner"):
+            raise ValueError("merge must be auto or owner")
+        if scope == "repo":
+            target.setdefault("ship", {})["merge"] = body["merge"]
+        else:
+            target["merge"] = body["merge"]
+    for k, v in (body.get("team") or {}).items():
+        if k not in TEAM_KEYS or not isinstance(v, bool):
+            raise ValueError(f"bad team setting {k}")
+        if not isinstance(target.get("team"), dict):
+            target["team"] = {} if target.get("team") is not False else {t: False for t in TEAM_KEYS}
+        target["team"][k] = v
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    tmp = target_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(target, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, target_path)
+    return read_settings()
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def _json(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path.split("?")[0] == "/api/settings":
+            try:
+                return self._json(200, read_settings())
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+        return super().do_GET()
+
+    def do_POST(self):
+        if self.path.split("?")[0] != "/api/settings":
+            return self._json(404, {"error": "not found"})
+        if self.headers.get("X-Work-Board") != "1" or "application/json" not in (self.headers.get("Content-Type") or ""):
+            return self._json(403, {"error": "missing X-Work-Board header"})
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+            return self._json(200, apply_settings(body.get("scope"), body))
+        except Exception as e:
+            return self._json(400, {"error": str(e)})
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
@@ -1008,12 +1276,14 @@ def main():
     args = ap.parse_args()
 
     repo = git_root(args.repo)
+    global REPO
+    REPO = repo
     SERVE = os.path.abspath(args.out) if args.out else os.path.join(tempfile.gettempdir(), "work-board" + slug(repo)[:80])
     OUT = os.path.join(SERVE, "data")
     os.makedirs(OUT, exist_ok=True)
     shutil.copyfile(os.path.join(HERE, "dashboard.html"), os.path.join(SERVE, "dashboard.html"))
     project_dirs = [os.path.expanduser(p) for p in args.project] if args.project else project_dirs_for(repo, os.getcwd())
-    pipelines = args.pipeline or [os.path.join(repo, ".agent", "state.json")]
+    pipelines = args.pipeline or [os.path.join(repo, ".agent", "state.json"), os.path.join(repo, ".work-runs", "*.json")]
     if not project_dirs:
         print("note: no Claude Code project folder found for this repo; showing the run manifest only "
               "(pass --project <config>/projects/<slug> to add workflow runs)", flush=True)
@@ -1029,7 +1299,17 @@ def main():
             print(f"snapshot: {args.snapshot} ({size / 1048576:.1f} MB){f', {skipped} media file(s) not embedded' if skipped else ''}")
         return
 
-    threading.Thread(target=loop, args=(project_dirs, pipelines), daemon=True).start()
+    info_path = os.path.join(SERVE, "board.json")
+    if os.path.isfile(info_path):
+        try:
+            info = json.load(open(info_path, encoding="utf-8"))
+            os.kill(int(info["pid"]), 0)
+            with socket.create_connection(("127.0.0.1", int(info["port"])), timeout=1):
+                pass
+            print(f"Run board (already running): {info['url']}  (repo {repo})", flush=True)
+            return
+        except (OSError, ValueError, KeyError):
+            pass
     handler = functools.partial(Quiet, directory=SERVE)
     srv = None
     for port in range(args.port, args.port + 21):
@@ -1040,7 +1320,12 @@ def main():
             continue
     if srv is None:
         raise SystemExit(f"ports {args.port}-{args.port + 20} are all taken")
-    print(f"Run board: http://127.0.0.1:{srv.server_address[1]}/dashboard.html  (repo {repo}; files in {SERVE})", flush=True)
+    url = f"http://127.0.0.1:{srv.server_address[1]}/dashboard.html"
+    write(info_path, json.dumps({"pid": os.getpid(), "port": srv.server_address[1], "url": url, "repo": repo}))
+    if os.path.isdir(os.path.join(repo, ".agent")):
+        write(os.path.join(repo, ".agent", "board.url"), url + "\n")
+    print(f"Run board: {url}  (repo {repo}; files in {SERVE})", flush=True)
+    threading.Thread(target=loop, args=(project_dirs, pipelines), daemon=True).start()
     srv.serve_forever()
 
 

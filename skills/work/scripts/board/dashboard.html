@@ -28,12 +28,22 @@ a{color:var(--blue)}
 button{font:inherit;color:inherit}
 [hidden]{display:none!important}
 .wrap{max-width:1360px;margin:0 auto;padding:20px 16px 40px}
-header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:18px}
 .brand{display:flex;gap:12px;align-items:center;min-width:0}
 .mark{width:38px;height:38px;border-radius:10px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;flex:none;font-weight:700;font-size:14px}
-h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
+h1{font-size:19px;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sub{color:var(--muted);font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative}
+.controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:nowrap;position:relative;min-height:38px}
+.controls .live{min-width:92px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#run-btn-name{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.controls .tools{display:inline-flex;gap:6px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
+.btn.spend{height:32px;font-variant-numeric:tabular-nums;font-weight:600}
+.btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
+.btn svg{flex:none}
+.pop.hist-pop{width:min(860px,calc(100vw - 32px));max-height:70vh;overflow:auto}
+.hist td.nw,.hist th.nw{white-space:nowrap}
+.hist .nm{font-weight:600}
+.hist-foot{display:grid;gap:4px;padding:10px;border-top:1px solid var(--border);font-size:13px}.hist-foot .h{color:var(--muted)}
 .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:5px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface)}
 .live .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
 .live.error{color:var(--red)}.live.error .dot{background:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
@@ -102,6 +112,19 @@ h1{font-size:19px;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
 .status-line{margin-top:.35rem;font-size:1rem;font-weight:600}
 .problem{margin:.5rem 0;padding:.6rem .9rem;border-radius:10px;background:var(--amber-soft);color:var(--text);outline:1px solid var(--amber)}
 .problem.soft{outline-color:var(--border);background:var(--surface-2)}
+#settings{border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);padding:0;max-width:760px;width:calc(100% - 32px)}
+#settings::backdrop{background:rgba(0,0,0,.45)}
+.set-form{padding:18px 20px}.set-form h3{margin:0 0 4px}.set-form .h{color:var(--muted);font-size:13px}.tier-note{margin:2px 0 8px}
+.set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}.set-grid .span2{grid-column:1/-1}.knobs{display:grid;grid-template-columns:1fr 1fr;column-gap:18px}@media(max-width:640px){.knobs{grid-template-columns:1fr}}
+.set-row input[type=number]{width:64px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px}@media(max-width:640px){.set-grid{grid-template-columns:1fr}}
+.set-form fieldset{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0}.set-form legend{font-weight:600;font-size:13px;color:var(--muted)}.set-form legend.sub{margin-top:10px}
+.set-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;font-size:14px}
+.set-row select{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+.scope select{margin-left:6px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px}
+.set-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:10px}.set-actions .h{margin-right:auto}
+.btn.primary{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.hist{width:100%;border-collapse:collapse;font-size:14px}.hist th,.hist td{text-align:left;padding:8px 10px;border-top:1px solid var(--border)}.hist th{color:var(--muted);font-weight:600;border-top:0}
+.hist tr.row{cursor:pointer}.hist tr.row:hover{background:var(--surface-2)}
 .app-link{display:flex;gap:.5rem;align-items:center;margin:.5rem 0 1rem;padding:.6rem .9rem;border-radius:10px;background:var(--surface-2);font-size:.95rem}
 .app-link a{color:inherit;font-weight:600}
 .app-link .h{color:var(--muted)}
@@ -220,12 +243,55 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.stepper{grid-template-columns:repeat(min(var(--n,9),5),minmax(0,1fr))}.step:nth-child(5n+1):before{display:none}}
 @media (max-width:720px){.docs{grid-template-columns:1fr}.doclist{border-right:0;border-bottom:1px solid var(--border);max-height:220px}.stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.step:before{display:none}.tbl .hide-sm{display:none}.viewer{padding:6px 14px 20px}
   .d-head{padding:16px}.d-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.files{border-right:0;border-bottom:1px solid var(--border);display:flex;gap:4px;overflow-x:auto;padding:8px}.files .group{display:none}.file{width:auto;white-space:nowrap}.doc{padding:18px 16px 48px}.ui-pair{grid-template-columns:1fr}}
+@media (max-width:720px){header{grid-template-columns:minmax(0,1fr)}.controls{justify-content:flex-start;gap:6px}.controls .live{min-width:0;font-size:0;gap:0;padding:8px}.controls .kbd{display:none}.controls .tools{margin-left:auto;border-left:0;padding-left:0}}
+
+.lanes-view,.split-view{display:none}
+body.view-lanes .wrap>:not(header):not(#lanes-view),body.view-split .wrap>:not(header):not(#split-view){display:none!important}
+body.view-lanes #lanes-view,body.view-split #split-view{display:block}
+.lane-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.lane-bar .h{color:var(--muted);font-size:13px}
+.lane-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+.lane-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;display:grid;gap:8px;text-align:left;color:var(--text);font:inherit;position:relative}
+.lane-card:hover{border-color:var(--brand)}
+.lane-card.sel{outline:2px solid var(--brand);outline-offset:1px}
+.lane-card .top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.lane-card .n{font-weight:700;font-size:15px}.lane-card .t{font-size:13px;color:var(--muted)}
+.lane-card .cur{font-size:13px}
+.lane-card .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lane-card .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}.lane-card .bar i{display:block;height:100%;background:var(--brand)}
+.lane-card .q{background:var(--amber-soft);color:var(--amber);border-radius:8px;padding:8px 10px;font-size:13px}
+.lane-card .pick{position:absolute;top:14px;right:14px}
+.lane-card .top{padding-right:28px}
+.split-grid{display:grid;gap:8px;height:calc(100vh - 120px)}
+body.view-split .wrap{max-width:none;padding:12px 10px 10px}
+body.view-split header{margin-bottom:8px}
+body.view-split #status-line{display:none}
+.split-grid.n2{grid-template-columns:1fr 1fr}.split-grid.n3,.split-grid.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.split-pane{border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;background:var(--surface);min-height:0}
+.split-pane .ph{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
+.split-pane iframe{border:0;flex:1;width:100%;min-height:0;background:var(--bg)}
+body.embed header .controls,body.embed #lanes-back{display:none!important}
+body.embed .wrap{padding:10px}
+#lanes-back[hidden]{display:none}
+#lanes-back{align-self:flex-start;margin:-10px 0 0 -6px}
+html.embed,body.embed{scrollbar-width:none}
+body.embed::-webkit-scrollbar,html.embed::-webkit-scrollbar{display:none}
+@media (max-width:720px){.split-grid{grid-template-columns:1fr!important;grid-template-rows:none!important;height:auto}.split-pane{height:70vh}}
+
+
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+*::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+*::-webkit-scrollbar-corner{background:transparent}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">
+      <button class="btn icon" id="lanes-back" hidden title="All lanes (L)" aria-label="All lanes (L)" data-testid="lanes-back"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="mark" id="mark">W</div>
       <div style="min-width:0">
         <h1 id="title">Run board</h1>
@@ -235,14 +301,32 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
     </div>
     <div class="controls">
       <span class="live" id="status"><span class="dot"></span>connecting…</span>
-      <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
-      <button class="btn" id="toggleTheme">Theme</button>
+      <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
+      <span class="tools">
+        <button class="btn icon" id="lanes-btn" hidden data-testid="open-lanes" aria-label="Lanes (L)" title="Lanes (L)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+        <button class="btn spend" id="spend-btn" data-testid="total-spend" aria-haspopup="dialog" aria-label="Total spent in this repo" title="Total spent in this repo: every run's agents plus every main chat. Click for the breakdown."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="spend-total">–</span></button>
+        <button class="btn icon" id="hist-btn" data-testid="open-history" aria-haspopup="dialog" aria-expanded="false" aria-label="All runs in this repo (H)" title="All runs in this repo (H)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+        <button class="btn icon" id="openSettings" data-testid="open-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button class="btn icon" id="toggleTheme" aria-label="Switch light or dark theme" title="Theme"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      </span>
+      <div class="pop hist-pop" id="hist-pop" hidden role="dialog" aria-label="All runs in this repo">
+        <div class="pop-sec">All runs in this repo</div>
+        <div id="history" data-testid="history"></div>
+      </div>
       <div class="pop" id="run-pop" hidden>
         <input id="run-q" placeholder="Filter runs…" autocomplete="off" aria-label="Filter runs">
         <div class="pop-list" id="run-list" role="listbox"></div>
       </div>
     </div>
   </header>
+  <section class="lanes-view" id="lanes-view" data-testid="lanes-view">
+    <div class="lane-bar"><b id="lanes-head">Lanes</b><span class="h" id="lanes-note"></span><span class="h" id="lanes-usage"></span><span style="flex:1"></span><button class="btn" id="split-btn" disabled title="Pick 2 to 4 lanes with their checkbox">Split view</button></div>
+    <div class="lane-grid" id="lane-grid"></div>
+  </section>
+  <section class="split-view" id="split-view" data-testid="split-view">
+    <div class="lane-bar"><span class="h" id="split-note"></span></div>
+    <div class="split-grid" id="split-grid"></div>
+  </section>
   <div id="banner"></div>
   <div class="kpis" id="kpis"></div>
 
@@ -272,7 +356,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
   </div>
 
   <footer>
-    <span>Keys: R runs · Esc close · click a step or a row for its prompt, activity and result</span>
+    <span>Keys: R runs · H all runs · Esc close · click a step or a row for its prompt, activity and result</span>
     <span>Cost is API-equivalent at list prices (estimated).</span>
   </footer>
 </div>
@@ -293,6 +377,26 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
   </aside>
 </div>
 
+<dialog id="settings" data-testid="settings">
+  <form method="dialog" class="set-form" id="set-form">
+    <h3>Run settings</h3>
+    <p class="h" id="set-src"></p>
+    <label class="scope">Apply to
+      <select id="set-scope"><option value="run">this run only (.agent/overrides.json)</option><option value="repo">every run (the profile)</option></select>
+    </label>
+    <div class="set-grid">
+      <fieldset><legend>Models</legend>
+        <label class="set-row"><b>Cost</b><select id="set-tier" data-testid="set-tier"><option value="lean">Lean: Sonnet and Haiku, small team</option><option value="balanced">Balanced: Opus for planning and review</option><option value="max">Max: Fable and Opus, full team</option></select></label>
+        <p class="h tier-note" id="tier-note"></p>
+        <div id="set-models"></div></fieldset>
+      <fieldset class="span2"><legend>Plan (blank = the cost template's default)</legend><div id="set-knobs" class="knobs"></div></fieldset>
+      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div><legend class="sub">Lanes</legend><label class="set-row" title="How many lane workflows run at the same time. Above 70% of the 5-hour usage it drops to 1; at 85% new steps wait for the reset.">Lanes at once<select id="set-lanes" data-testid="set-lanes"><option>1</option><option>2</option><option>3</option><option>4</option></select></label><legend class="sub">Ship</legend><label class="set-row" title="On: when CI is green, an approver agent merges the PR or hands it to you with a question. Migrations, protected files and security changes always come to you.">Auto-merge<input type="checkbox" id="set-merge" data-testid="set-merge"></label><p class="h" id="merge-note"></p></fieldset>
+    </div>
+    <p class="h">Changes apply when the next workflow starts (the plan, or the build after H1). A stage turned off is reported as skipped in the evidence.</p>
+    <div class="set-actions"><span id="set-msg" class="h"></span><button value="cancel" class="btn">Close</button><button id="set-save" class="btn primary" value="default">Save</button></div>
+  </form>
+</dialog>
+
 <script>
 const POLL_MS = 2000
 const $ = (id) => document.getElementById(id)
@@ -302,7 +406,11 @@ const store = {
   set(k, v) { try { localStorage.setItem('wfboard.' + k, JSON.stringify(v)) } catch {} },
 }
 let state = null
-let runId = store.get('runid', null)
+const QS = new URLSearchParams(location.search)
+const EMBED = QS.get('embed') === '1'
+let runId = QS.get('run') || store.get('runid', null)
+let view = 'run', laneAuto = !QS.get('run'), splitSel = new Set(), splitIds = []
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed') }
 const prefs = { filter: 'all', role: '', phase: '' }
 let model = null
 let open = null, openFile = null, openText
@@ -431,7 +539,8 @@ function markKb() { const rows = [...$('run-list').querySelectorAll('.run-row')]
 function openPop() { $('run-pop').hidden = false; $('run-btn').setAttribute('aria-expanded', 'true'); $('run-q').value = ''; popIndex = -1; renderRunPicker(); $('run-q').focus() }
 function closePop() { $('run-pop').hidden = true; $('run-btn').setAttribute('aria-expanded', 'false') }
 function selectRun(id) {
-  runId = id; store.set('runid', id)
+  runId = id; if (!EMBED) store.set('runid', id)
+  setView('run')
   prefs.filter = 'all'; prefs.role = ''; prefs.phase = ''; docSel = null; docText = undefined; lastSig = ''
   closePop(); closeDrawer(); render()
 }
@@ -447,8 +556,72 @@ function phaseState(gs) {
   return cs.some((c) => c === 'done') ? 'active' : 'pending'
 }
 
+function setView(v) {
+  view = v
+  document.body.classList.toggle('view-lanes', v === 'lanes')
+  document.body.classList.toggle('view-split', v === 'split')
+  if (v === 'split') renderSplit()
+  if (state) render()
+}
+function laneState(l) {
+  const s = String(l.state || '')
+  if (l.question || s.startsWith('waiting')) return ['wait', 'Needs you']
+  if (s.startsWith('running')) return ['running', 'Running']
+  if (s.startsWith('error') || s.startsWith('stopped') || s.startsWith('stalled')) return ['issue', 'Stopped']
+  if (s.startsWith('finished') || s.startsWith('done')) return ['done', 'Done']
+  return ['queued', s || 'Not started']
+}
+function renderLanes() {
+  const lanes = state?.lanes || []
+  $('lanes-btn').hidden = EMBED || !lanes.length
+  $('lanes-back').hidden = EMBED || !lanes.length || view === 'lanes' || !currentRun()?.lane
+  if (view !== 'lanes') return
+  const running = lanes.filter((l) => laneState(l)[0] === 'running').length
+  $('lanes-head').textContent = `Lanes · ${lanes.length}`
+  $('lanes-note').textContent = `${running} running · up to ${state.lanes_cap || 3} at once`
+  const five = state.usage?.five_hour
+  $('lanes-usage').textContent = five && five.used_percentage != null ? `Usage ${Math.round(five.used_percentage)}% of 5 h${five.used_percentage >= 85 ? ' · paused until the reset' : five.used_percentage >= 70 ? ' · 1 lane at a time' : ''}` : ''
+  $('lane-grid').innerHTML = lanes.map((l) => {
+    const [c, label] = laneState(l)
+    const pct = l.total ? Math.round(100 * l.done / l.total) : 0
+    return `<div class="lane-card ${splitSel.has(l.run_id) ? 'sel' : ''}" role="button" tabindex="0" data-lane-run="${esc(l.run_id || '')}" data-testid="lane-card">
+      <input type="checkbox" class="pick" data-pick="${esc(l.run_id || '')}" ${splitSel.has(l.run_id) ? 'checked' : ''} aria-label="Pick lane ${esc(l.lane)} for split view" title="Split view">
+      <div class="top"><span class="n">Lane ${esc(l.lane)}</span><span class="pill ${c === 'wait' ? 'wait' : c === 'issue' ? 'issue' : c === 'done' ? 'done' : c === 'running' ? 'running' : ''}">${esc(label)}</span></div>
+      <div class="t">${esc(l.name)}</div>
+      <div class="cur">${esc(l.current || (c === 'done' ? 'All steps done' : 'Between steps'))}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="meta"><span>${l.done}/${l.total} steps</span><span>${money(l.cost)}</span><span>${l.elapsed ? dur(l.elapsed) : '–'}</span>${l.app_url ? `<a href="${esc(l.app_url)}" target="_blank" rel="noopener">${esc(l.app_url.replace('http://', ''))}</a>` : ''}<span>${esc(l.branch || '')}</span></div>
+      ${l.question ? `<div class="q"><b>Needs you:</b> ${esc(l.question.split('\n')[0])} <span class="h">Answer in the chat that started the lanes.</span></div>` : ''}
+    </div>`
+  }).join('') || '<div class="empty">No lanes yet. Start them with /work lanes.</div>'
+  $('split-btn').disabled = splitSel.size < 2
+  $('split-btn').textContent = splitSel.size >= 2 ? `Split view (${splitSel.size})` : 'Split view'
+}
+function renderSplit() {
+  const ids = [...splitSel].slice(0, 4)
+  if (ids.join() === splitIds.join() && $('split-grid').children.length) return
+  splitIds = ids
+  $('split-note').textContent = `${ids.length} lanes side by side`
+  $('split-grid').className = `split-grid n${ids.length}`
+  $('split-grid').innerHTML = ids.map((id) => {
+    const l = (state?.lanes || []).find((x) => x.run_id === id) || {}
+    return `<div class="split-pane"><div class="ph"><span>Lane ${esc(l.lane || '?')} · ${esc(l.name || id)}</span><button class="btn" data-open-run="${esc(id)}">Open</button></div><iframe src="dashboard.html?run=${encodeURIComponent(id)}&embed=1" title="Lane ${esc(l.lane || '')}"></iframe></div>`
+  }).join('')
+}
+
 function render() {
+  if (laneAuto && !EMBED && state?.lanes?.length) { laneAuto = false; view = 'lanes'; document.body.classList.add('view-lanes') }
+  renderLanes()
   renderRunPicker()
+  if (view === 'lanes' || view === 'split') {
+    const lanes = state.lanes || [], need = lanes.filter((l) => laneState(l)[0] === 'wait').length
+    $('title').textContent = view === 'lanes' ? 'Lanes' : 'Lanes · split view'
+    $('subtitle').textContent = `${lanes.length} lanes · ${lanes.filter((l) => laneState(l)[0] === 'running').length} running${need ? ` · ${need} need you` : ''} · ${money(lanes.reduce((n, l) => n + (l.cost || 0), 0))} so far`
+    $('status-line').textContent = need ? 'A lane is waiting on you: answer in the chat that started the lanes.' : 'Click a lane for its board; tick 2 to 4 for split view. Press L to come back here.'
+    document.title = `${need ? '◆ ' : ''}Lanes · Run board`
+    renderHistory()
+    return
+  }
   const run = currentRun()
   if (!run) { $('title').textContent = 'Run board'; $('subtitle').textContent = 'No workflow runs found yet.'; return }
   model = buildModel(run)
@@ -461,6 +634,7 @@ function render() {
   document.title = `${run.running ? '● ' : waiting.length ? '◆ ' : ''}${run.name} · Run board`
   $('mark').textContent = initials(run.name)
   $('title').textContent = run.name
+  $('title').title = run.name
   $('subtitle').innerHTML = [esc(run.state), isPipeline(run) ? '/work pipeline' : 'workflow run', `started ${esc(ago(run.started))}`, `elapsed ${dur(run.elapsed)}`, money(run.cost) + ' est.']
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
   $('status-line').textContent = statusLine(run, gs)
@@ -499,6 +673,7 @@ function render() {
   renderTable(run, gs)
   renderEvidence(run)
   renderDocs(run)
+  renderHistory()
 }
 
 function statusLine(run, gs) {
@@ -516,6 +691,109 @@ function statusLine(run, gs) {
     return `${a.phase}: ${live || a.title}. ${done} of ${gs.length} steps done${nextGate ? `; ${nextGate.title.split(':')[0]} needs you next` : ''}.`
   }
   return `Between steps: ${done} of ${gs.length} done; next is ${left[0].title}.`
+}
+
+function renderHistory() {
+  const runs = (state?.runs || []).filter((r) => isPipeline(r) || !(state.runs || []).some((p) => isPipeline(p) && p.groups.some((g) => g.agents.some((a) => a.run === r.id))))
+  const rows = runs.slice().sort((a, b) => (b.started || 0) - (a.started || 0)).map((r) => {
+    const by = Object.entries(r.cost_by_model || {}).sort((a, b) => b[1] - a[1]).map(([m, c]) => `${cap(m)} ${money(c)}`).join(' · ') || '–'
+    const when = r.started ? new Date(r.started * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–'
+    return `<tr class="row" data-run="${esc(r.id)}"><td><div class="nm">${esc(r.name)}</div><div class="h">${isPipeline(r) ? '/work run' : 'workflow'} · ${esc(r.state)}</div></td><td class="nw">${esc(when)}</td><td class="num nw">${r.elapsed ? dur(r.elapsed) : '–'}</td><td class="num nw">${money(r.cost)}</td><td class="num nw">${isPipeline(r) ? money(r.main_cost) : '–'}</td><td>${esc(by)}</td></tr>`
+  }).join('')
+  const runTotal = runs.reduce((n, r) => n + (r.cost || 0), 0)
+  const sess = state?.sessions || []
+  const sessTotal = sess.reduce((n, x) => n + (x.cost || 0), 0)
+  const sessBy = {}
+  for (const x of sess) for (const [m, c] of Object.entries(x.by_model || {})) if (!String(m).startsWith('<')) sessBy[m] = (sessBy[m] || 0) + c
+  const agentTotal = runs.reduce((n, r) => n + (r.cost || 0) - (isPipeline(r) ? (r.main_cost || 0) : 0), 0)
+  const grand = agentTotal + sessTotal
+  $('spend-total').textContent = money(grand)
+  const sessByTxt = Object.entries(sessBy).sort((a, b) => b[1] - a[1]).map(([m, c]) => `${cap(m)} ${money(c)}`).join(' · ')
+  const foot = `<div class="hist-foot"><div data-testid="total-spend-line"><b>Total spent in this repo:</b> ${money(grand)} <span class="h">(agents ${money(agentTotal)} + main chats ${money(sessTotal)})</span></div><div><b>Runs listed:</b> ${money(runTotal)} <span class="h">(agents plus each run's share of its main chat)</span></div><div><b>All main chats in this repo:</b> ${money(sessTotal)} <span class="h">${sess.length} session(s)${sessByTxt ? ' · ' + esc(sessByTxt) : ''}; includes talk outside runs</span></div>${sess.slice().sort((a, b) => (b.last || 0) - (a.last || 0)).map((x) => `<div class="h">· chat ${esc(x.id.slice(0, 8))}: ${x.first ? esc(new Date(x.first * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })) : ''}, ${money(x.cost)} (${esc(Object.entries(x.by_model || {}).filter(([m]) => !m.startsWith('<')).map(([m, c]) => cap(m) + ' ' + money(c)).join(' · '))})</div>`).join('')}</div>`
+  $('history').innerHTML = rows ? `<table class="hist"><tr><th>Run</th><th class="nw">Started</th><th class="nw">Time</th><th class="nw">Cost</th><th class="nw">Main chat</th><th>By model</th></tr>${rows}</table>${foot}` : '<div class="empty">No runs yet.</div>'
+}
+
+let settings = null
+const TIERS = {
+  lean: { note: 'Sonnet plans and builds; Opus for the guardrails (PM, CEO, verifiers); Haiku for designer, research and gate runs. Small issues skip the CEO design review and the senior devs, one plan revision, lower effort.',
+    models: { plan: 'sonnet', approve: 'sonnet', research: 'haiku', work: 'sonnet', pm: 'opus', ceo: 'opus', design: 'haiku', senior: 'sonnet', verify: 'opus', cheap: 'haiku' } },
+  balanced: { note: 'Opus for the architect, approver, senior devs, verifiers, PM and CEO; Sonnet builds; Haiku researches. Medium team, two revisions.',
+    models: { plan: 'opus', approve: 'opus', research: 'haiku', work: 'sonnet', pm: 'opus', ceo: 'opus', design: 'sonnet', senior: 'opus', verify: 'opus', cheap: 'haiku' } },
+  max: { note: 'Fable plans and approves, Opus everywhere else, full team on every issue. For risky or large issues; the most expensive.',
+    models: { plan: 'fable', approve: 'fable', research: 'sonnet', work: 'opus', pm: 'opus', ceo: 'opus', design: 'opus', senior: 'opus', verify: 'opus', cheap: 'haiku' } },
+}
+const TIER_KNOBS = {
+  lean: { revisions: 1, areas: 3, outside: 1, design_review: 'only on max, or balanced for medium and large issues', seniors: 'none for small issues, one otherwise, all for large', effort: { research: 'low', pm: 'low', ceo: 'low', design: 'medium', plan: 'medium', review: 'medium', senior: 'medium' } },
+  balanced: { revisions: 2, areas: 4, outside: 2, effort: { research: 'low' } },
+  max: { revisions: 2, areas: 6, outside: 4, effort: {} },
+}
+function fillKnobs(tier, kn) {
+  const d = TIER_KNOBS[tier], eff = (kn.effort || {})
+  const num = (k, lo, hi, label) => `<label class="set-row">${label}<input type="number" min="${lo}" max="${hi}" data-knob="${k}" value="${kn[k] ?? ''}" placeholder="${d[k] ?? ''}"></label>`
+  const sel = (k, opts, label) => `<label class="set-row">${label}<select data-knob="${k}"><option value="">auto</option>${opts.map((o) => `<option ${kn[k] === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`
+  const ER = { plan: 'Architect effort', review: 'Verifier and approver effort', senior: 'Senior devs effort', design: 'Designer effort', pm: 'PM effort', ceo: 'CEO effort', research: 'Research effort' }
+  $('set-knobs').innerHTML = num('revisions', 0, 3, 'Plan revision rounds') + num('areas', 1, 6, 'Researchers (code areas)') + num('outside', 0, 4, 'Outside research questions')
+    + sel('design_review', ['on', 'off'], 'CEO design review') + sel('seniors', ['none', 'one', 'all'], 'Senior devs')
+    + Object.entries(ER).map(([r, label]) => `<label class="set-row">${label}<select data-effort="${r}"><option value="">${d.effort[r] ? 'template: ' + d.effort[r] : 'template: model default'}</option>${['low', 'medium', 'high'].map((o) => `<option ${eff[r] === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`).join('')
+}
+function applyTier(t) {
+  const avail = new Set(settings.available_models)
+  const order = ['fable', 'opus', 'sonnet', 'haiku']
+  for (const [k, m] of Object.entries(TIERS[t].models)) {
+    const el = document.querySelector(`[data-model="${k}"]`)
+    if (!el) continue
+    el.value = avail.has(m) ? m : (order.slice(order.indexOf(m)).find((x) => avail.has(x)) || '')
+  }
+  $('tier-note').textContent = TIERS[t].note
+  fillKnobs(t, {})
+}
+async function openSettings() {
+  if (SNAP) { alert('Settings can be changed on the live board only (this is a snapshot).'); return }
+  const res = await fetch('/api/settings', { cache: 'no-store' })
+  settings = await res.json()
+  if (settings.error) { alert(settings.error); return }
+  fillSettings()
+  $('settings').showModal()
+}
+function fillSettings() {
+  const scope = $('set-scope').value
+  const src = scope === 'run' ? mergeRun(settings.repo, settings.run) : settings.repo
+  $('set-src').textContent = `Profile: ${settings.profile_path || 'none'}${settings.model_fallback ? ` · fallback model ${settings.model_fallback}` : ''}`
+  const opts = (cur) => ['<option value="">(fallback)</option>', ...settings.available_models.map((m) => `<option ${m === cur ? 'selected' : ''}>${esc(m)}</option>`)].join('')
+  const LABEL = { plan: 'Architect (plan)', approve: 'Approver', research: 'Research', work: 'Developers, tester, QA', pm: 'PM', ceo: 'CEO', design: 'UI/UX designer', senior: 'Senior devs', verify: 'Verifiers', cheap: 'Gate runs, screenshots' }
+  $('set-models').innerHTML = Object.keys(LABEL).map((k) => `<label class="set-row">${LABEL[k]}<select data-model="${k}">${opts(src.models[k])}</select></label>`).join('')
+  const SL = { video: 'QA videos', qa: 'Agent QA', ui_shots: 'UI before/after screenshots', garden: 'Gardener' }
+  $('set-stages').innerHTML = Object.keys(SL).map((k) => `<label class="set-row">${SL[k]}<input type="checkbox" data-stage="${k}" ${src.stages[k] ? 'checked' : ''}></label>`).join('')
+  const TL = { pm: 'PM', ceo: 'CEO', design: 'UI/UX designer', senior: 'Senior devs' }
+  $('set-team').innerHTML = Object.keys(TL).map((k) => `<label class="set-row">${TL[k]}<input type="checkbox" data-team="${k}" ${src.team[k] ? 'checked' : ''}></label>`).join('')
+  const tier = (scope === 'run' && settings.tier.run) || settings.tier.repo || 'balanced'
+  $('set-tier').value = tier
+  $('tier-note').textContent = TIERS[tier].note
+  fillKnobs(tier, (scope === 'run' ? { ...settings.knobs.repo, ...settings.knobs.run } : settings.knobs.repo) || {})
+  $('set-lanes').value = String((scope === 'run' && settings.lanes_cap && settings.lanes_cap.run) || (settings.lanes_cap && settings.lanes_cap.repo) || 3)
+  const merge = (scope === 'run' && settings.merge && settings.merge.run) || (settings.merge && settings.merge.repo) || 'owner'
+  $('set-merge').checked = merge === 'auto'
+  $('merge-note').textContent = merge === 'auto' ? 'An approver merges green PRs; one-way changes still come to you.' : 'PRs wait for you to merge.'
+  $('set-msg').textContent = ''
+}
+function mergeRun(repo, run) {
+  return { models: { ...repo.models, ...(run.models || {}) },
+    stages: Object.fromEntries(Object.entries(repo.stages).map(([k, v]) => [k, run[k] === undefined ? v : run[k] !== false])),
+    team: { ...repo.team, ...Object.fromEntries(Object.entries((run.team || {})).map(([k, v]) => [k, v !== false])) } }
+}
+async function saveSettings(e) {
+  e.preventDefault()
+  const body = { scope: $('set-scope').value, tier: $('set-tier').value, merge: $('set-merge').checked ? 'auto' : 'owner', lanes_concurrency: $('set-lanes').value, models: {}, stages: {}, team: {} }
+  document.querySelectorAll('[data-model]').forEach((el) => { body.models[el.dataset.model] = el.value })
+  document.querySelectorAll('[data-stage]').forEach((el) => { body.stages[el.dataset.stage] = el.checked })
+  document.querySelectorAll('[data-team]').forEach((el) => { body.team[el.dataset.team] = el.checked })
+  body.knobs = { effort: {} }
+  document.querySelectorAll('[data-knob]').forEach((el) => { body.knobs[el.dataset.knob] = el.value })
+  document.querySelectorAll('[data-effort]').forEach((el) => { body.knobs.effort[el.dataset.effort] = el.value })
+  const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Work-Board': '1' }, body: JSON.stringify(body) })
+  const out = await res.json()
+  if (out.error) { $('set-msg').textContent = out.error; return }
+  settings = out; fillSettings(); $('set-msg').textContent = body.scope === 'run' ? 'Saved for this run.' : `Saved to ${out.profile_path}.`
 }
 
 function renderRoles(run, gs) {
@@ -541,10 +819,17 @@ function renderTable(run, gs) {
   $('filters').innerHTML = `<button class="chip ${prefs.filter === 'all' ? 'on' : ''}" data-filter="all">All<span class="n">${scoped.length}</span></button>`
     + CATS.filter((k) => c[k]).map((k) => `<button class="chip ${prefs.filter === k ? 'on' : ''}" data-filter="${k}">${CAT_LABEL[k]}<span class="n">${c[k]}</span></button>`).join('')
   $('agentsTitle').textContent = [prefs.role || 'All steps', prefs.phase && `stage ${prefs.phase}`].filter(Boolean).join(' · ')
-  const order = { wait: 0, running: 1, issue: 2, queued: 3, done: 4, skipped: 5 }
+  const order = { wait: 0, running: 1, issue: 2, done: 3, queued: 4, skipped: 5 }
   const phases = run.phases || []
   const list = scoped.filter((g) => prefs.filter === 'all' || cat(g) === prefs.filter)
-    .sort((a, b) => order[cat(a)] - order[cat(b)] || (isPipeline(run) ? phases.indexOf(a.phase) - phases.indexOf(b.phase) : (b.started || 0) - (a.started || 0)))
+    .sort((a, b) => {
+      const byCat = order[cat(a)] - order[cat(b)]
+      if (byCat) return byCat
+      const step = isPipeline(run) ? phases.indexOf(a.phase) - phases.indexOf(b.phase) : 0
+      if (cat(a) === 'queued') return step
+      const last = (g) => g.ended || ((g.started || 0) + (g.elapsed || 0))
+      return (last(b) - last(a)) || -step
+    })
   if (!list.length) {
     const filtered = prefs.filter !== 'all' || prefs.role || prefs.phase
     $('agents').innerHTML = `<tr><td class="empty">${filtered ? 'Nothing matches these filters. <button class="chip" data-clear="1">Show all steps</button>' : 'Nothing here yet'}</td></tr>`
@@ -738,6 +1023,39 @@ async function poll() {
 
 // ---- events ----
 $('run-btn').addEventListener('click', (e) => { e.stopPropagation(); $('run-pop').hidden ? openPop() : closePop() })
+$('openSettings').addEventListener('click', openSettings)
+$('lanes-btn').addEventListener('click', () => setView(view === 'lanes' ? 'run' : 'lanes'))
+$('lanes-back').addEventListener('click', () => setView('lanes'))
+$('split-btn').addEventListener('click', () => { if (splitSel.size >= 2) setView('split') })
+$('lane-grid').addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]')
+  if (pick) {
+    const id = pick.dataset.pick
+    if (pick.checked) { if (splitSel.size >= 4) { pick.checked = false; return } splitSel.add(id) } else splitSel.delete(id)
+    return renderLanes()
+  }
+  if (e.target.closest('a')) return
+  const card = e.target.closest('[data-lane-run]')
+  if (card && card.dataset.laneRun) selectRun(card.dataset.laneRun)
+})
+$('lane-grid').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.dataset.laneRun) selectRun(e.target.dataset.laneRun) })
+$('split-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-open-run]'); if (b) selectRun(b.dataset.openRun) })
+$('settings').addEventListener('click', (e) => {
+  const r = $('settings').getBoundingClientRect()
+  if (e.target === $('settings') && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) $('settings').close()
+})
+function toggleHist(force) {
+  const show = force === undefined ? $('hist-pop').hidden : force
+  $('hist-pop').hidden = !show
+  $('hist-btn').setAttribute('aria-expanded', String(show))
+  if (show) { closePop(); renderHistory() }
+}
+$('hist-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleHist() })
+$('spend-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleHist() })
+$('set-scope').addEventListener('change', fillSettings)
+$('set-tier').addEventListener('change', (e) => applyTier(e.target.value))
+$('set-form').addEventListener('submit', (e) => { if (e.submitter && e.submitter.value === 'cancel') return; saveSettings(e) })
+$('history').addEventListener('click', (e) => { const r = e.target.closest('[data-run]'); if (r) { toggleHist(false); selectRun(r.dataset.run) } })
 $('run-q').addEventListener('input', () => { popIndex = 0; renderRunPicker() })
 $('run-q').addEventListener('keydown', (e) => {
   const rows = [...$('run-list').querySelectorAll('.run-row')]
@@ -752,6 +1070,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('click', (e) => {
   if (e.target.closest('a')) return
   if (!e.target.closest('#run-pop') && !$('run-pop').hidden) closePop()
+  if (!e.target.closest('#hist-pop') && !e.target.closest('#hist-btn') && !e.target.closest('#spend-btn') && !$('hist-pop').hidden) toggleHist(false)
   const t = (sel) => e.target.closest(sel)
   let el
   if ((el = t('[data-run]'))) return selectRun(el.dataset.run)
@@ -770,11 +1089,13 @@ document.addEventListener('click', (e) => {
   if (t('[data-close]')) closeDrawer()
 })
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (!$('run-pop').hidden) return closePop(); return closeDrawer() }
+  if (e.key === 'Escape') { if (!$('hist-pop').hidden) { toggleHist(false); return $('hist-btn').focus() } if (!$('run-pop').hidden) return closePop(); return closeDrawer() }
   const row = e.target.closest?.('[data-group]')
   if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); return openDrawer({ kind: 'group', id: row.dataset.group }) }
   if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey || document.body.classList.contains('open')) return
-  if (e.key.toLowerCase() === 'r') { e.preventDefault(); openPop() }
+  if (e.key.toLowerCase() === 'r') { e.preventDefault(); toggleHist(false); openPop() }
+  if (e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHist() }
+  if (e.key.toLowerCase() === 'l' && state?.lanes?.length && !EMBED) { e.preventDefault(); setView(view === 'lanes' ? 'run' : 'lanes') }
 })
 
 // ---- markdown (no external library: works offline and in snapshots) ----

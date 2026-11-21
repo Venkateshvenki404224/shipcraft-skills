@@ -15,8 +15,10 @@ Writes atomically; never touches anything outside .agent/.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 
 PHASES = ["Intake", "Plan", "Tests first", "Implement", "Gate + E2E", "Verify", "Agent QA", "UI + video", "Ship"]
 STATUSES = {"RUN", "DONE", "PASS", "FAIL", "CHANGES", "WAIT", "TODO", "SKIP", "STOPPED"}
@@ -79,6 +81,24 @@ def save(m):
     os.replace(tmp, PATH)
 
 
+ARCHIVE = os.path.join(repo_root(), ".work-runs")
+
+
+def archive(m):
+    os.makedirs(ARCHIVE, exist_ok=True)
+    name = re.sub(r"[^A-Za-z0-9_-]+", "-", m.get("run") or "run").strip("-")
+    dest = os.path.join(ARCHIVE, f"{name}.json")
+    tmp = dest + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(m, f, indent=1)
+    os.replace(tmp, dest)
+    exclude = os.path.join(repo_root(), ".git", "info", "exclude")
+    if os.path.isfile(exclude) and ".work-runs/" not in open(exclude).read().split():
+        with open(exclude, "a") as f:
+            f.write("\n.work-runs/\n")
+    return dest
+
+
 def add_artifact(lst, rel):
     if rel and rel not in lst:
         lst.append(rel)
@@ -121,13 +141,15 @@ def main():
             old = json.load(open(PATH, encoding="utf-8"))
             if old.get("run") != a.run and not old.get("finished"):
                 sys.exit(f".agent/ belongs to unfinished run {old.get('run')!r}; refusing to overwrite")
+            if old.get("run") != a.run:
+                archive(old)
         off = {x.strip() for x in a.team_off.split(",") if x.strip()}
         if "all" in off:
             off = set(TEAM) - {"garden"}
         skip = (NO_APP if a.no_app else set()) | {k for m_ in off for k in TEAM.get(m_, set())}
         steps = [{"key": k, "num": k, "phase": ph, "title": t, "who": who, "deps": deps, "artifacts": [],
                   "status": "SKIP" if k in skip else "TODO"} for k, ph, t, who, deps in STAGES]
-        m = {"run": a.run, "name": a.name, "phases": PHASES, "steps": steps, "finished": False,
+        m = {"run": a.run, "name": a.name, "phases": PHASES, "steps": steps, "finished": False, "started_at": time.time(),
              "artifacts": [".agent/issue.md"]}
         if a.session:
             m["session"] = a.session
@@ -173,11 +195,12 @@ def main():
         print(f"workflow {a.kind}: {a.run_id}")
     elif a.cmd == "finish":
         m["finished"] = True
+        m["finished_at"] = time.time()
         for s in m["steps"]:
             if s.get("status") == "RUN":
                 s["status"] = "STOPPED"
         save(m)
-        print("finished")
+        print(f"finished; archived to {os.path.relpath(archive(m), repo_root())}")
     elif a.cmd == "show":
         print(f"**{m.get('run')}** · {m.get('name')}{' · finished' if m.get('finished') else ''}\n")
         for kind, rec in (m.get("workflows") or {}).items():

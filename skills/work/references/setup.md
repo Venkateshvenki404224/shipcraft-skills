@@ -10,7 +10,8 @@ Find it in this order and stop at the first hit:
 
 1. A path the owner gave: `/work setup <path>`, or `--profile <path>` on any `/work` call.
 2. The `WORK_PROFILE` environment variable.
-3. `.work-profile/work.json`.
+3. `.agent/profile.json`: a parallel lane's profile, written by `scripts/lanes.py` with that lane's ports. Never edit it by hand.
+4. `.work-profile/work.json`.
 
 Call the result `PROFILE_PATH`. Pass it to every workflow as `args.profilePath`. The rest of this skill says "the profile" for this file. Review rules and other files the setup writes go in the same `.work-profile/` folder (`.work-profile/review-rules.md`).
 
@@ -55,6 +56,13 @@ When the profile is missing (or the owner says `/work setup`):
 | `rules` | every agent | files with project rules; agents follow them |
 | `review_rules` | approve, verify, UI review | project rules a finding can cite |
 | `secrets` | every agent, ship check | globs never printed, never committed |
+| `protected_paths` | gate, ship check | globs a run branch may not change: the checks it is judged by (for example `Makefile`, `scripts/check*.sh`, the structure tests, `e2e/playwright.config.*`). Always protected: `.work-profile/**`, `.github/workflows/**`. Tests are not protected; the review rules catch weakened ones |
+| `intake` | plan | `false` = no ACCEPT / NEEDS_INFO / REJECT decision (a cheap scope pass only); `{"comment": true}` = post NEEDS_INFO questions on the issue without asking. `models.intake` picks its model (default the approve model) |
+| `routing` | build (verify) | `{"risk": {"low": {"lenses": ["correctness"], "model": "work"}, …}, "surfaces": {"security": {"lens": "security", "model": "verify"}, …}}`. Lenses: correctness, security, ui, money, data, migration; a model is a role name (work, verify, approve, plan, cheap) or an alias. Omit it for the defaults (SKILL.md §3) |
+| `ship.merge` | ship | `owner` (default: the PR waits for you) or `auto` (an approver agent merges when CI is green, §6 step 5). The board's Settings (Ship) sets it for one run or every run. `ship.merge_method`: `merge` (default), `squash` or `rebase`. `ship.escalate`: surfaces that always go to a person (default `["security", "migration"]`) |
+| `work_types` | intake | per-type changes to the chore / bug / feat presets (SKILL.md, Work types); `worktype.py show` prints the result |
+| `plan` | every step (`budget.py`) | usage margins for a subscription: `stop_at_percent` (85), `buffer_minutes` (15), `week_stop_at_percent` (95), `window_minutes` (only when the status line gives no percentages). SKILL.md, Usage limits |
+| `issues.sync`, `issues.comments` | every stage | `sync: true` keeps the issue's `work:<stage>` label current and links the PR with `Closes #n`; `comments: false` = labels only. Ask at first setup (recommended on) |
 | `app.url`, `app.check`, `app.expect` | intake `stack`, QA, UI snap | omit `app` when there is no running app |
 | `app.start`, `app.start_minutes` | intake `stack` | run when the check fails; tell the owner how long |
 | `app.login`, `app.auth` | intake, QA, UI snap | `auth` is a storageState path pattern with `{role}` |
@@ -71,6 +79,26 @@ When the profile is missing (or the owner says `/work setup`):
 | `model_fallback` | workflows | the model any role without one uses; one of `available_models` |
 | `models` | workflows | `plan` (architect), `approve` (approver), `research` (scope, researchers), `work` (tester, developers, gate, fixer, QA, evidence). Optional: `pm`, `ceo`, `design` (fall back to `plan`), `senior`, `verify` (fall back to `approve`), and `cheap` for the mechanical stages that only run commands and report (the scope pass, gate runs, red runs, UI snap captures; falls back to `work`; a small model such as `haiku` fits). Values come from `available_models` |
 | `team` | plan, build | `false` = lean pipeline; or `{pm, ceo, design, senior}` as `false` to turn one off; `senior` may be a list of reviewer names; `stack`, `business`, `design_system` (`references/team.md`) |
-| `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs") |
+| `autonomy` | gates, ship | asked on first setup; default `owner`: the owner approves H1 and H2. `agents`: the team stands in at both gates (SKILL.md, "Unattended runs"). May be per mode: `{"single": "owner", "chain": "agents", "lanes": "owner"}` |
+| `tier`, `knobs` | plan | cost template `lean`, `balanced` (default) or `max`, and per-part overrides (SKILL.md, Cost templates). Ask the owner which template on first setup |
+| `video`, `qa`, `ui_shots`, `garden` | build | `false` skips that stage (QA videos, agent QA, UI before/after screenshots, the Gardener); the evidence names each skipped stage. The board's Settings panel sets these, and the models, for every run (here) or for one run (`.agent/overrides.json`) |
 | `ship.mode` | ship | `pr` (default) or `squash` |
 | `ship.auto_push` | ship | with `autonomy: agents` only: push the run branch after each commit (never the base branch, never a PR) |
+
+## Lanes (parallel runs)
+
+`/work lanes` runs independent issues side by side, each in its own git worktree. Each lane needs its own ports, so the profile says which ports exist and how commands receive them:
+
+```
+"lanes": {
+  "url": "http://localhost:{port}",
+  "health": "/healthz",
+  "ports": { "port": 8090, "e2e_port": 8099 },
+  "step": 10,
+  "env": { "DEV_ADDR": ":{port}", "APP_E2E_PORT": "{e2e_port}" },
+  "copy": [".claude/settings.local.json"]
+}
+```
+
+Lane k gets every port plus k × `step`. Every gate, e2e and app command in the lane's profile runs with `env` set, so the project's scripts must read those variables (a dev server address, a test server port, a Docker project name). Leave `lanes` out when the project cannot run twice on one machine. `concurrency` (default 3; the board's Settings, Lanes) caps how many lane workflows run at once; `plan.lanes_one_at_percent` (default 70) drops it to 1 as the 5-hour window fills. Lane worktrees live in `.claude/worktrees/lane-<n>` (git-excluded).
+

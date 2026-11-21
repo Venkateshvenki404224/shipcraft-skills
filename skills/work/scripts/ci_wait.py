@@ -26,6 +26,8 @@ def main():
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for every check to finish")
     p.add_argument("--appear", type=int, default=180, help="seconds to wait for the first check to show up")
     p.add_argument("--interval", type=int, default=15)
+    p.add_argument("--owner-check", action="append", default=["one-way-doors"],
+                   help="a check that waits on the owner (a label, a review), not a failure: reported as owner")
     a = p.parse_args()
     start = time.time()
     while True:
@@ -41,7 +43,10 @@ def main():
         if pending and waited < a.timeout:
             time.sleep(a.interval)
             continue
-        failed = [c for c in rows if c.get("bucket") in ("fail", "cancel")]
+        owner_names = tuple(a.owner_check)
+        is_owner = lambda c: str(c.get("name", "")).startswith(owner_names)
+        failed = [c for c in rows if c.get("bucket") in ("fail", "cancel") and not is_owner(c)]
+        owner = [c for c in rows if c.get("bucket") in ("fail", "cancel") and is_owner(c)]
         for c in rows:
             print(f"  {c.get('bucket', '?'):8} {c.get('name')}  {c.get('link') or ''}")
         if pending:
@@ -50,6 +55,9 @@ def main():
         if failed:
             print(f"red: {len(failed)} of {len(rows)} check(s) failed: " + ", ".join(c["name"] for c in failed))
             sys.exit(1)
+        if owner:
+            print(f"owner: every other check passed; waiting on the owner for: " + ", ".join(c["name"] for c in owner))
+            sys.exit(4)
         print(f"green: all {len(rows)} check(s) passed in {int(waited)}s")
         return
 

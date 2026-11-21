@@ -31,11 +31,13 @@ const APP = P.app || {}
 const ROLES = A.roles && A.roles.length ? A.roles : (P.roles && P.roles.length ? P.roles : [])
 const RISK = A.risk || 'medium'
 const BUDGET = { build: (A.budgets && A.budgets.build) ?? 2, qa: (A.budgets && A.budgets.qa) ?? 1 }
-const GATE = (P.gate || []).map((c, i) => `${i + 1}. ${c}`).join('\n')
+const BASE_REF = A.base || `origin/${P.base || 'main'}`
+const PROTECT = `python3 ${SKILL}/scripts/protected.py --base ${BASE_REF}${A.profilePath ? ` --profile ${A.profilePath}` : ''}${(A.protectedOk || []).map((p) => ` --allow '${p}'`).join('')}`
+const GATE = [...(P.gate || []), PROTECT].map((c, i) => `${i + 1}. ${c}`).join('\n')
 const E2E = A.e2e || (P.e2e && P.e2e.cmd) || ''
 const BROWSERS = (P.e2e && P.e2e.browsers) || ['chromium']
 const REVIEW_RULES = [P.review_rules, `${SKILL}/references/review-rules.md`].filter(Boolean).join(' and ')
-const AUTO = P.autonomy === 'agents'
+const AUTO = (A.autonomy || (P.autonomy && typeof P.autonomy === 'object' ? (P.autonomy.single || 'owner') : P.autonomy)) === 'agents'
 const M = P.models || {}
 const FB = P.model_fallback
 const MISSING = ['plan', 'approve', 'research', 'work'].filter((k) => !(M[k] || FB))
@@ -51,19 +53,41 @@ const STACK = TEAM.stack || P.stack || ''
 const BUSINESS = TEAM.business ? ` What the business sells and to whom: ${TEAM.business}` : ''
 const DESIGN_SYSTEM = (P.ui && P.ui.design_system) || TEAM.design_system || []
 const FEATURE_MAP = P.feature_map || ''
+const QA_ON = P.qa !== false
+const SHOTS_ON = P.ui_shots !== false
+const UI_SHOTS = !!A.ui && SHOTS_ON
 const CASES = (A.testPlan && Array.isArray(A.testPlan.cases)) ? A.testPlan.cases : null
 const UI_TICKETS = T.filter((t) => t.kind !== 'test' && (t.role === 'frontend' || t.role === 'ui'))
 const E2E_COVERED = new Set((CASES || []).filter((c) => c.kind === 'e2e').flatMap((c) => c.covers || []))
 const UNCOVERED_UI = CASES ? UI_TICKETS.filter((t) => !E2E_COVERED.has(t.id)).map((t) => t.id) : []
 const EVALS = P.evals && P.evals.cmd ? { cmd: P.evals.cmd, paths: P.evals.paths || [] } : null
 const GARDEN = P.garden === false ? null : { log: (P.garden && P.garden.log) || 'docs/garden.md', repeat: (P.garden && P.garden.repeat) || 2 }
-const RULES = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
+// The result goes back into the orchestrator's context, which has to last the whole run: long strings and lists
+// are cut here. Every detail is in the .agent/ files the agents wrote (and in the workflow journal).
+const SLIM_STR = (A.slim && A.slim.chars) || 240, SLIM_LIST = (A.slim && A.slim.items) || 6
+function slim(v, depth = 0) {
+  if (A.slim === false) return v
+  if (typeof v === 'string') return v.length > SLIM_STR ? `${v.slice(0, SLIM_STR)}… (+${v.length - SLIM_STR} chars, see the .agent/ file)` : v
+  if (Array.isArray(v)) {
+    const cap = v.every((x) => typeof x === 'string' && x.length <= 120) ? 40 : SLIM_LIST
+    const kept = v.slice(0, cap).map((x) => slim(x, depth + 1))
+    return v.length > cap ? [...kept, `… +${v.length - cap} more in the .agent/ file`] : kept
+  }
+  if (v && typeof v === 'object') return depth > 4 ? '(nested; see the .agent/ file)' : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, slim(x, depth + 1)]))
+  return v
+}
+const SUMMARY_RULE = 'Every Markdown file you write under .agent/ starts with "## Summary": 3 to 5 bullets a person can skim; the detail follows.'
+const RULES0 = `Rules: follow the project rules (${(P.rules || ['CLAUDE.md']).join(', ')}). Never print secrets (${(P.secrets || ['.env*']).join(', ')}).
 Do not commit, push or touch git history.`
+const RULES = `${RULES0} ${SUMMARY_RULE}`
 
 // An agent that dies on an API error returns null: try it up to 3 times before giving up on that step.
+// A lane (`/work lanes`): every agent works only in the lane's own worktree. One orchestrator runs every lane's workflows.
+const LANE_DIR = A.dir || ''
+const LANE_HEAD = LANE_DIR ? `LANE: work ONLY in the git worktree ${LANE_DIR}${A.branch ? ` (branch ${A.branch})` : ''}. Start every Bash command with \`cd ${LANE_DIR} && \`, give Read, Edit, Write, Grep and Glob absolute paths under ${LANE_DIR}, and read every \`.agent/\` path as ${LANE_DIR}/.agent/. Never touch the main checkout or another lane.\n\n` : ''
 async function run(prompt, opts) {
   for (let i = 0; i < 3; i++) {
-    const r = await agent(prompt, { ...opts, label: i ? `${opts.label} (retry ${i})` : opts.label })
+    const r = await agent(LANE_HEAD + prompt, { ...opts, label: `${LANE_DIR && A.lane ? `lane ${A.lane} · ` : ''}${i ? `${opts.label} (retry ${i})` : opts.label}` })
     if (r) return r
     log(`${opts.label}: no result, attempt ${i + 1}/3`)
   }
@@ -113,7 +137,7 @@ const UIREV = {
 
 const PMREP = { type: 'object', properties: { met: { type: 'integer' }, total: { type: 'integer' }, not_met: { type: 'array', items: { type: 'string' } }, entry_point_ok: { type: 'boolean' }, summary: { type: 'string' } }, required: ['met', 'total', 'not_met', 'entry_point_ok', 'summary'] }
 const GARDEN_RES = { type: 'object', properties: { checks_added: { type: 'array', items: { type: 'object', properties: { rule: { type: 'string' }, file: { type: 'string' }, catches: { type: 'string' } }, required: ['rule', 'file', 'catches'] } }, logged: { type: 'array', items: { type: 'string' } }, skipped: { type: 'array', items: { type: 'object', properties: { finding: { type: 'string' }, why: { type: 'string' } }, required: ['finding', 'why'] } } }, required: ['checks_added', 'logged', 'skipped'] }
-const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix'] }
+const SIGNOFF = { type: 'object', properties: { verdict: { type: 'string', enum: ['SHIP', 'HOLD'] }, reasons: { type: 'array', items: { type: 'string' } }, must_fix: { type: 'array', items: { type: 'string' } }, followups: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'reasons', 'must_fix', 'followups'] }
 
 // Who builds a ticket: tickets.json "role" (the architect sets it); "kind": "test" is always the test engineer.
 const DEV = {
@@ -168,6 +192,7 @@ const fix = (label, phaseName, what) => run(
   `Fix round for ${NAME} run ${A.run}. Read .agent/plan.md. Fix these problems in the product code:
 ${JSON.stringify(what)}
 Never weaken an assertion, widen a timeout or delete a test to make it pass; if a test is wrong against the test contract, fix the test and say why.
+A "protected" failure means a protected file changed (the checks and config this branch is judged by): restore it from the base with git checkout ${BASE_REF} -- <file>; never edit the protected list.
 Return the files you changed. ${RULES}`,
   { label: `Fixer: ${label}`, phase: phaseName, schema: DONE, model: W })
 
@@ -218,7 +243,7 @@ if (A.mode === 'fixup') {
   result.fixes.push(await fix('owner fixup', 'Fix', { owner_themes: A.fixup && A.fixup.themes, findings: 'see .agent/evidence.md, .agent/qa/*.json, .agent/ui/review.json' }))
   phase('Gate + E2E')
   result.gates.push(await gate('fixup', 'Gate + E2E'))
-  if (A.ui) { phase('UI after'); result.ui = await uiAfter(':fixup') }
+  if (UI_SHOTS) { phase('UI after'); result.ui = await uiAfter(':fixup') }
 } else {
   // ------------------------------------------------ Tests first
   phase('Tests first')
@@ -243,7 +268,7 @@ For each one, add at least one case with "kind": "e2e" and "covers": ["<ticket i
   result.red = red
 
   // ------------------------------------------------ UI before (base code still in place)
-  if (A.ui) {
+  if (UI_SHOTS) {
     phase('UI before')
     result.uiBefore = await run(`Run the UI before capture on the current code, before anything is implemented:
 ${snapCmd('before')}
@@ -269,14 +294,26 @@ It reads .agent/ui/pages.json. Report the shot count and any errors. Do not chan
 
   // ------------------------------------------------ Verify by risk tier
   phase('Verify')
-  const LENSES = RISK === 'high' ? ['correctness and regressions', 'security, auth and role checks', 'UI rules, accessibility, phone widths'] : ['correctness and regressions']
-  const verifyModel = RISK === 'low' ? W : VERIFY_M
-  const reviews = (await parallel(LENSES.map((lens) => () => run(
+  const LENS_TEXT = {
+    correctness: 'correctness and regressions', security: 'security, auth and role checks', ui: 'UI rules, accessibility, phone widths',
+    money: 'money: integer amounts, rounding, totals that must balance, currency formatting', data: 'data: stored records and history stay consistent, undo works, nothing is edited in place that must not be',
+    migration: 'migrations: one-way schema changes, backfills, what happens to existing data, how to roll back',
+  }
+  const ROUTE = Object.assign({ low: { lenses: ['correctness'], model: 'work' }, medium: { lenses: ['correctness'], model: 'verify' }, high: { lenses: ['correctness', 'security', 'ui'], model: 'verify' } }, (P.routing && P.routing.risk) || {})
+  const SURFACE_ROUTE = Object.assign({ security: { lens: 'security', model: 'verify' }, ui: { lens: 'ui', model: 'work' }, money: { lens: 'money', model: 'verify' }, data: { lens: 'data', model: 'verify' }, migration: { lens: 'migration', model: 'verify' } }, (P.routing && P.routing.surfaces) || {})
+  const modelOf = (key) => ({ work: W, verify: VERIFY_M, approve: APPROVE_M, plan: PLAN_M, cheap: CHEAP })[key] || M[key] || key
+  const base = ROUTE[RISK] || ROUTE.medium
+  const routed = new Map(base.lenses.map((l) => [l, modelOf(base.model)]))
+  for (const s of (A.surfaces || [])) if (SURFACE_ROUTE[s] && !routed.has(SURFACE_ROUTE[s].lens)) routed.set(SURFACE_ROUTE[s].lens, modelOf(SURFACE_ROUTE[s].model))
+  const LENSES = [...routed.keys()]
+  log(`verify routing: risk ${RISK}${(A.surfaces || []).length ? `, surfaces ${A.surfaces.join(', ')}` : ''} -> ${LENSES.map((l) => `${l} (${routed.get(l)})`).join(', ')}`)
+  result.routing = { risk: RISK, surfaces: A.surfaces || [], lenses: Object.fromEntries(routed) }
+  const reviews = (await parallel(LENSES.map((key) => [key, LENS_TEXT[key] || key]).map(([key, lens]) => () => run(
     `Review the uncommitted diff of ${NAME} run ${A.run} (git diff; new files included) through this lens: ${lens}.
 Read .agent/plan.md for intent and ${REVIEW_RULES}. Each finding cites a rule heading from those files, or names a concrete failing
 behaviour (input -> wrong output); anything else is an opinion: leave it out. Confirm every finding against the code before you report it:
 a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, with file:line. Change nothing.`,
-    { label: `Verifier: ${lens.split(' ')[0].replace(/,$/, '')}`, phase: 'Verify', schema: FINDINGS, model: verifyModel })))).filter(Boolean)
+    { label: `Verifier: ${key}`, phase: 'Verify', schema: FINDINGS, model: routed.get(key) })))).filter(Boolean)
   result.verify = reviews
   const serious = reviews.flatMap((r) => r.findings).filter((f) => f.severity === 'blocker' || f.severity === 'major' || f.severity === 'minor')
   if (serious.length && result.rounds.build < BUDGET.build) {
@@ -288,12 +325,14 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
   // ------------------------------------------------ Agent QA, one explorer per role (on video when there is an app)
   phase('Agent QA')
   const qaRoles = ROLES.length ? ROLES : ['user']
-  const qa = (await parallel(qaRoles.map((role) => () => run(qaPrompt(role),
-    { label: `QA: ${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean)
+  const qa = QA_ON ? (await parallel(qaRoles.map((role) => () => run(qaPrompt(role),
+    { label: `QA: ${role}`, phase: 'Agent QA', schema: QA, model: W })))).filter(Boolean) : []
+  if (!QA_ON) log('agent QA is off in the profile: skipped')
+  result.skipped = [!QA_ON && 'agent QA', A.ui && !SHOTS_ON && 'UI before/after screenshots', !A.video && 'QA videos'].filter(Boolean)
   result.qa = qa
 
   // ------------------------------------------------ UI after + review
-  if (A.ui) { phase('UI after'); result.ui = await uiAfter('') }
+  if (UI_SHOTS) { phase('UI after'); result.ui = await uiAfter('') }
 
   // ------------------------------------------------ one QA fix round
   const qaMajors = qa.flatMap((r) => r.findings.map((f) => ({ ...f, role: r.role }))).filter((f) => !f.existing_bug && (f.severity === 'blocker' || f.severity === 'major'))
@@ -303,7 +342,7 @@ a wrong finding costs more than a missed one. Severity blocker/major/minor/nit, 
     result.rounds.qa++
     result.fixes.push(await fix('QA findings', 'Fix', { qa: qaMajors, ui: uiFlags }))
     result.gates.push(await gate('after QA', 'Fix'))
-    if (A.ui) result.uiRecheck = await uiAfter(':recheck')
+    if (UI_SHOTS) result.uiRecheck = await uiAfter(':recheck')
   } else if (qaMajors.length || uiFlags.length) log('QA findings left: QA budget used up; they go to the owner')
 }
 
@@ -336,7 +375,7 @@ ${JSON.stringify(result)}
 Sections: what was built (plain words); test results as a role x browser table with NOT RUN where a browser did not run, plus flakes by name;
 gate table; verification verdict and what was fixed; agent QA counts and open findings grouped by theme (existing bugs labelled);
 UI before/after: every non-unchanged shot with its verdict (if .agent/ui/shots.json exists); videos: every file under .agent/video/ with role
-and kind; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
+and kind; stages skipped by the settings (result.skipped), each named as skipped; fix rounds used vs budget; garden: checks added (rule, file, what it catches) and patterns logged; stages with time; cost marked "estimated" unless measured; files touched (git status).
 Short sentences, no hype. Return the first 3 lines of the file.`,
   { label: 'Evidence: report', phase: 'Evidence', model: W })
 
@@ -355,7 +394,10 @@ if (CEO_ON) {
     `You are the CEO of ${NAME}.${BUSINESS} Decide whether run ${A.run} is ready to ship.
 Read .agent/ceo.md (your scope, must-haves and never-claim list)${PM_ON ? ', .agent/pm-report.md' : ''}, .agent/evidence.md and .agent/qa/*.json.
 SHIP when the must-haves are in, the gate is green, nothing blocker or major is open and nothing in the product promises what it does not do. Otherwise HOLD,
-with must_fix: the exact items to fix before it ships. Write .agent/ceo-signoff.md (verdict, reasons, must_fix). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
+with must_fix: only blockers, the exact items a user or the owner would be hurt by if this shipped (a red gate, an unmet must-have, a bug, a security hole, data loss,
+the product promising what it does not do). Put everything else in followups, not must_fix: docs wording, screenshots to retake, a re-run of QA or a review on
+an already green tree, PR text, test-count bookkeeping, polish. Followups never make a HOLD: with an empty must_fix the verdict is SHIP. Write .agent/ceo-signoff.md
+(verdict, reasons, must_fix, followups). ${AUTO ? 'In this run your SHIP replaces the owner\'s H2.' : 'The owner makes the final call at H2.'}`,
     { label: 'CEO: sign-off', phase: 'Sign-off', schema: SIGNOFF, model: CEO_M })
 }
-return result
+return slim(result)

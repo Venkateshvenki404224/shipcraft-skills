@@ -34,7 +34,8 @@ Every finding cites one heading from these files, or names a concrete failing be
 
 ## Tests
 - Tests use only the hooks and calls in the plan's test contract.
-- A fix never weakens an assertion, widens a timeout or deletes a test to go green.
+- A fix never weakens an assertion, widens a timeout or deletes a test to go green. Compare every changed test with the base: a removed assertion, a loosened match, a skip, a test that special-cases the code under test, or a widened timeout is BLOCKING unless the plan asked for it.
+- The branch never edits the checks it is judged by (`protected_paths`; `scripts/protected.py` fails the gate on them). A run that needs one changed says so in the plan, and the owner allows it.
 - A test that fails once and then passes is a flake: name it.
 - A tautological test (restates the implementation, only asserts a mock was called, or cannot fail when the behaviour breaks) is a finding: replace it with one that can fail.
 - A stateful feature without a property-based test for each invariant in the plan is a finding.
