@@ -227,7 +227,28 @@ def verdict(result):
         for k in ("approved", "pass"):
             if isinstance(result.get(k), bool):
                 return "PASS" if result[k] else "CHANGES"
+        if isinstance(result.get("green"), bool):
+            return "PASS" if result["green"] else "FAIL"
     return "DONE"
+
+
+def verdict_line(result):
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except Exception:
+            return result
+    if not isinstance(result, dict):
+        return str(result)
+    fails = result.get("failures") or result.get("must_fix") or result.get("findings") or []
+    head = result.get("summary") or result.get("verdict") or ""
+    def item(f):
+        if isinstance(f, str):
+            return f
+        what = f.get("what") or f.get("title") or f.get("check") or f.get("name") or json.dumps(f)
+        return f"{f['where']}: {what}" if f.get("where") else what
+    items = "\n".join(f"- {one_line(item(f), 200)}" for f in fails[:5]) + (f"\n- … and {len(fails) - 5} more below" if len(fails) > 5 else "") if isinstance(fails, list) and fails else ""
+    return "\n\n".join(x for x in [head, f"Failed:\n{items}" if items else ""] if x) or "see the result below"
 
 
 # ---------------------------------------------------------------- runs
@@ -365,7 +386,17 @@ def export_run(run_dir, now):
                     tickets[t["id"]] = t
 
         adir = os.path.join(base, "agents", aid)
-        write(os.path.join(adir, "result.md"), to_md(a["result"]) if a["done"] else "_Still running._")
+        if not a["done"]:
+            res_md = "_Still running._"
+        elif a["result"] is None:
+            tail = "\n".join(f"- {tool}: {one_line(str(detail), 160)}" for _, tool, detail in info["events"][-8:]) or "- (no tool calls recorded)"
+            why = wf_error if wf_error else ("it was retried; see the retry below" if retried else "the agent ended without a report (an API or network error, or it was stopped)")
+            res_md = f"## What happened\n\n**{status}:** {why}.\n\n## Its last steps\n\n{tail}\n\nFull transcript: `{apath}`"
+        else:
+            res_md = to_md(a["result"])
+            if status in ("FAIL", "CHANGES"):
+                res_md = f"## What happened\n\n**{status}:** {verdict_line(a['result'])}\n\nFull transcript: `{apath}`\n\n---\n\n" + res_md
+        write(os.path.join(adir, "result.md"), res_md)
         ev = info["events"][-MAX_EVENTS:]
         act = [f"# Activity · {a['label']}", "",
                f"Model `{short_model(info['model'])}` · {info['tokens_out']:,} output tokens · ${info['cost']:.2f}", ""]
@@ -788,7 +819,13 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
             sid = f"step-{re.sub(r'[^A-Za-z0-9_-]+', '-', key)}"
             detail = s.get("detail") or ""
             detail = "\n".join(detail) if isinstance(detail, list) else str(detail)
-            write(os.path.join(base, "agents", sid, "result.md"), f"# {s.get('title') or key}\n\n{detail or '_Nothing recorded yet._'}")
+            summ = s.get("summary") or ""
+            body = "\n\n".join(x for x in [f"**{status}:** {summ}" if summ else "", detail] if x)
+            if not body:
+                body = "_Nothing recorded yet._" if status in ("TODO", "RUN") else f"**{status}**, with no summary. The orchestrator records why with `state.py step {key} --summary`; the run's notes are in `.agent/decisions.md` and `.agent/evidence.md`."
+            if status in ("FAIL", "STOPPED") and mine:
+                body += "\n\nEach agent's own result and full log is in this pipeline's workflow runs (" + ", ".join(f"`{r.get('id')}`" for r in mine) + "): pick one in the Runs menu (R)."
+            write(os.path.join(base, "agents", sid, "result.md"), f"# {s.get('title') or key}\n\n{body}")
             write(os.path.join(base, "agents", sid, "activity.md"), f"_No agent: this step is done by the {s.get('who') or 'orchestrator'}._")
             write(os.path.join(base, "agents", sid, "prompt.md"), "_No prompt._")
             n_running += status == "RUN"
