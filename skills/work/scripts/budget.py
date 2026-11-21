@@ -67,6 +67,7 @@ def main():
     p.add_argument("--need", type=int, default=30, help="minutes the next step is expected to take")
     p.add_argument("--profile")
     p.add_argument("--max-age", type=int, default=900, help="seconds the status line's numbers stay trusted")
+    p.add_argument("--lanes", type=int, help="the lane cap: also print how many lanes may run now (1 above lanes_one_at_percent, 0 when stopping)")
     a = p.parse_args()
     plan = {**DEFAULT_PLAN, **(profile(a.profile).get("plan") or {})}
     lim = from_tap(a.max_age)
@@ -98,6 +99,10 @@ def main():
         stop, why, resume_at = True, why + [f"weekly window at {wu:.0f}% (resets {clock(week.get('resets_at'))})"], max(reset or 0, week.get("resets_at") or 0)
     facts = [f"5h {used:.0f}%" if used is not None else "5h usage unknown", f"resets {clock(reset)} ({left_min} min)" if reset else "", f"week {wu:.0f}%" if wu is not None else "", source]
     line = "; ".join(f for f in facts if f)
+    if a.lanes is not None:
+        one_at = plan.get("lanes_one_at_percent", 70)
+        allowed = 0 if stop else (1 if used is not None and used >= one_at else a.lanes)
+        print(f"lanes: {allowed} of {a.lanes} may run" + (f" (usage {used:.0f}% is over {one_at}%)" if allowed == 1 and a.lanes > 1 else ""))
     if stop:
         print(f"budget: stop: {'; '.join(why)}. {line}. Save the run state and stop; /work resume after {clock(resume_at)}.")
         sys.exit(3)

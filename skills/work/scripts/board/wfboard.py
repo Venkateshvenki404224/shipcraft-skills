@@ -896,6 +896,37 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
             "_mtime": os.path.getmtime(manifest)}
 
 
+def lane_dirs():
+    if not REPO:
+        return []
+    r = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True, cwd=REPO)
+    out = []
+    for block in r.stdout.split("\n\n"):
+        m = re.search(r"^worktree (.+)$", block, re.M)
+        if m and os.path.realpath(m.group(1)) != os.path.realpath(REPO) and os.path.isfile(os.path.join(m.group(1), ".agent", "lane.json")):
+            out.append(m.group(1))
+    return out
+
+
+def lanes_cap():
+    prof, over = settings_paths()
+    cap = None
+    if over and os.path.isfile(over):
+        cap = (json.load(open(over, encoding="utf-8")).get("lanes") or {}).get("concurrency")
+    if cap is None and prof:
+        cap = (json.load(open(prof, encoding="utf-8")).get("lanes") or {}).get("concurrency")
+    return int(cap or 3)
+
+
+def usage_now():
+    p = os.path.expanduser(os.environ.get("WORK_USAGE_FILE", "~/.claude/work-usage.json"))
+    if not os.path.isfile(p):
+        return None
+    d = json.load(open(p, encoding="utf-8"))
+    rl = d.get("rate_limits") or {}
+    return {"at": d.get("at"), "five_hour": rl.get("five_hour"), "seven_day": rl.get("seven_day")}
+
+
 def export_once(project_dirs, pipeline_globs):
     now = time.time()
     try:
@@ -915,6 +946,30 @@ def export_once(project_dirs, pipeline_globs):
                 runs.append({"id": "pl_" + os.path.basename(os.path.dirname(os.path.dirname(p))), "name": p, "state": "error",
                              "error": f"{p}: {e}", "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0,
                              "cost": 0, "elapsed": 0})
+        lanes = []
+        for d in lane_dirs():
+            meta = json.load(open(os.path.join(d, ".agent", "lane.json"), encoding="utf-8"))
+            sp = os.path.join(d, ".agent", "state.json")
+            run = None
+            if os.path.isfile(sp):
+                try:
+                    run = export_pipeline(sp, project_dirs, now, wf_runs)
+                    run["id"] = f"pl_lane-{meta.get('issue')}"
+                    run["lane"] = str(meta.get("issue"))
+                    runs.append(run)
+                except Exception as e:
+                    run = {"id": f"pl_lane-{meta.get('issue')}", "name": f"lane {meta.get('issue')}", "state": "error", "error": str(e),
+                           "phases": [], "groups": [], "artifacts": [], "agents": 0, "running": 0, "cost": 0, "elapsed": 0, "lane": str(meta.get("issue"))}
+                    runs.append(run)
+            q = os.path.join(d, ".agent", "question.md")
+            groups = (run or {}).get("groups") or []
+            lanes.append({"lane": str(meta.get("issue")), "run_id": (run or {}).get("id"), "dir": d, "branch": meta.get("branch"),
+                          "ports": meta.get("ports"), "app_url": ((meta.get("ports") or {}).get("port") and f"http://localhost:{meta['ports']['port']}"),
+                          "name": (run or {}).get("name") or f"lane {meta.get('issue')}", "state": (run or {}).get("state") or "not started",
+                          "done": sum(1 for g in groups if g.get("status") in ("DONE", "SKIP", "PASS")), "total": len(groups),
+                          "cost": (run or {}).get("cost") or 0, "elapsed": (run or {}).get("elapsed") or 0,
+                          "current": next((g.get("title") for g in groups if g.get("status") in ("RUN", "WAIT", "FAIL")), ""),
+                          "question": open(q, encoding="utf-8").read().strip()[:400] if os.path.isfile(q) else ""})
         seen, uniq = set(), []
         for r in runs:
             if r["id"] in seen:
@@ -943,7 +998,8 @@ def export_once(project_dirs, pipeline_globs):
                     for (_t, c, mdl) in si["series"]:
                         by[mdl] = round(by.get(mdl, 0) + c, 4)
                     sessions.append({"id": os.path.basename(sp)[:-6], "cost": round(si["cost"], 4), "first": si["first"], "last": si["last"], "by_model": by})
-        state = {"generated": now, "project": project_dirs, "runs": runs, "sessions": sessions}
+        state = {"generated": now, "project": project_dirs, "runs": runs, "sessions": sessions,
+                 "lanes": sorted(lanes, key=lambda x: int(x["lane"]) if str(x["lane"]).isdigit() else 0), "lanes_cap": lanes_cap(), "usage": usage_now()}
     except Exception as e:
         state = {"generated": now, "error": str(e), "runs": []}
     write(os.path.join(OUT, "state.json"), json.dumps(state))
@@ -1081,6 +1137,7 @@ def read_settings():
             "tier": {"repo": prof.get("tier") or "balanced", "run": over.get("tier")},
             "knobs": {"repo": prof.get("knobs") or {}, "run": over.get("knobs") or {}},
             "merge": {"repo": (prof.get("ship") or {}).get("merge") or "owner", "run": over.get("merge")},
+            "lanes_cap": {"repo": (prof.get("lanes") or {}).get("concurrency") or 3, "run": (over.get("lanes") or {}).get("concurrency")},
             "available_models": prof.get("available_models") or ["opus", "sonnet", "haiku", "fable"],
             "model_fallback": prof.get("model_fallback"),
             "repo": view(prof, team), "run": over}
@@ -1138,6 +1195,11 @@ def apply_settings(scope, body):
         if k == "garden" and v and isinstance(target.get("garden"), dict):
             continue
         target[k] = v if k != "garden" or not v else {"log": "docs/garden.md", "repeat": 2}
+    if body.get("lanes_concurrency") not in (None, ""):
+        n = int(body["lanes_concurrency"])
+        if n not in range(1, 5):
+            raise ValueError("lanes at once must be 1 to 4")
+        target.setdefault("lanes", {})["concurrency"] = n
     if "merge" in body:
         if body["merge"] not in ("auto", "owner"):
             raise ValueError("merge must be auto or owner")

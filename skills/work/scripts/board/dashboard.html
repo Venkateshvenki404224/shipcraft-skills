@@ -244,12 +244,47 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
 @media (max-width:720px){.docs{grid-template-columns:1fr}.doclist{border-right:0;border-bottom:1px solid var(--border);max-height:220px}.stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.step:before{display:none}.tbl .hide-sm{display:none}.viewer{padding:6px 14px 20px}
   .d-head{padding:16px}.d-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.files{border-right:0;border-bottom:1px solid var(--border);display:flex;gap:4px;overflow-x:auto;padding:8px}.files .group{display:none}.file{width:auto;white-space:nowrap}.doc{padding:18px 16px 48px}.ui-pair{grid-template-columns:1fr}}
 @media (max-width:720px){header{grid-template-columns:minmax(0,1fr)}.controls{justify-content:flex-start;gap:6px}.controls .live{min-width:0;font-size:0;gap:0;padding:8px}.controls .kbd{display:none}.controls .tools{margin-left:auto;border-left:0;padding-left:0}}
+
+.lanes-view,.split-view{display:none}
+body.view-lanes .wrap>:not(header):not(#lanes-view),body.view-split .wrap>:not(header):not(#split-view){display:none!important}
+body.view-lanes #lanes-view,body.view-split #split-view{display:block}
+.lane-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.lane-bar .h{color:var(--muted);font-size:13px}
+.lane-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+.lane-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;display:grid;gap:8px;text-align:left;color:var(--text);font:inherit;position:relative}
+.lane-card:hover{border-color:var(--brand)}
+.lane-card.sel{outline:2px solid var(--brand);outline-offset:1px}
+.lane-card .top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.lane-card .n{font-weight:700;font-size:15px}.lane-card .t{font-size:13px;color:var(--muted)}
+.lane-card .cur{font-size:13px}
+.lane-card .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lane-card .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}.lane-card .bar i{display:block;height:100%;background:var(--brand)}
+.lane-card .q{background:var(--amber-soft);color:var(--amber);border-radius:8px;padding:8px 10px;font-size:13px}
+.lane-card .pick{position:absolute;top:14px;right:14px}
+.lane-card .top{padding-right:28px}
+.split-grid{display:grid;gap:8px;height:calc(100vh - 120px)}
+body.view-split .wrap{max-width:none;padding:12px 10px 10px}
+body.view-split header{margin-bottom:8px}
+body.view-split #status-line{display:none}
+.split-grid.n2{grid-template-columns:1fr 1fr}.split-grid.n3,.split-grid.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.split-pane{border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;background:var(--surface);min-height:0}
+.split-pane .ph{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
+.split-pane iframe{border:0;flex:1;width:100%;min-height:0;background:var(--bg)}
+body.embed header .controls,body.embed #lanes-back{display:none!important}
+body.embed .wrap{padding:10px}
+#lanes-back[hidden]{display:none}
+#lanes-back{align-self:flex-start;margin:-10px 0 0 -6px}
+html.embed,body.embed{scrollbar-width:none}
+body.embed::-webkit-scrollbar,html.embed::-webkit-scrollbar{display:none}
+@media (max-width:720px){.split-grid{grid-template-columns:1fr!important;grid-template-rows:none!important;height:auto}.split-pane{height:70vh}}
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">
+      <button class="btn icon" id="lanes-back" hidden title="All lanes (L)" aria-label="All lanes (L)" data-testid="lanes-back"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="mark" id="mark">W</div>
       <div style="min-width:0">
         <h1 id="title">Run board</h1>
@@ -261,6 +296,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
       <span class="live" id="status"><span class="dot"></span>connecting…</span>
       <button class="btn" id="run-btn" aria-haspopup="listbox" aria-expanded="false" title="Switch run (R)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="sdot" id="run-btn-dot"></span><span id="run-btn-name">Runs</span><span class="kbd">R</span></button>
       <span class="tools">
+        <button class="btn icon" id="lanes-btn" hidden data-testid="open-lanes" aria-label="Lanes (L)" title="Lanes (L)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
         <button class="btn spend" id="spend-btn" data-testid="total-spend" aria-haspopup="dialog" aria-label="Total spent in this repo" title="Total spent in this repo: every run's agents plus every main chat. Click for the breakdown."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="spend-total">–</span></button>
         <button class="btn icon" id="hist-btn" data-testid="open-history" aria-haspopup="dialog" aria-expanded="false" aria-label="All runs in this repo (H)" title="All runs in this repo (H)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
         <button class="btn icon" id="openSettings" data-testid="open-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -276,6 +312,14 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
       </div>
     </div>
   </header>
+  <section class="lanes-view" id="lanes-view" data-testid="lanes-view">
+    <div class="lane-bar"><b id="lanes-head">Lanes</b><span class="h" id="lanes-note"></span><span class="h" id="lanes-usage"></span><span style="flex:1"></span><button class="btn" id="split-btn" disabled title="Pick 2 to 4 lanes with their checkbox">Split view</button></div>
+    <div class="lane-grid" id="lane-grid"></div>
+  </section>
+  <section class="split-view" id="split-view" data-testid="split-view">
+    <div class="lane-bar"><span class="h" id="split-note"></span></div>
+    <div class="split-grid" id="split-grid"></div>
+  </section>
   <div id="banner"></div>
   <div class="kpis" id="kpis"></div>
 
@@ -339,7 +383,7 @@ footer{margin-top:22px;font-size:11.5px;color:var(--faint);display:flex;gap:20px
         <p class="h tier-note" id="tier-note"></p>
         <div id="set-models"></div></fieldset>
       <fieldset class="span2"><legend>Plan (blank = the cost template's default)</legend><div id="set-knobs" class="knobs"></div></fieldset>
-      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div><legend class="sub">Ship</legend><label class="set-row" title="On: when CI is green, an approver agent merges the PR or hands it to you with a question. Migrations, protected files and security changes always come to you.">Auto-merge<input type="checkbox" id="set-merge" data-testid="set-merge"></label><p class="h" id="merge-note"></p></fieldset>
+      <fieldset><legend>Stages</legend><div id="set-stages"></div><legend class="sub">Team</legend><div id="set-team"></div><legend class="sub">Lanes</legend><label class="set-row" title="How many lane workflows run at the same time. Above 70% of the 5-hour usage it drops to 1; at 85% new steps wait for the reset.">Lanes at once<select id="set-lanes" data-testid="set-lanes"><option>1</option><option>2</option><option>3</option><option>4</option></select></label><legend class="sub">Ship</legend><label class="set-row" title="On: when CI is green, an approver agent merges the PR or hands it to you with a question. Migrations, protected files and security changes always come to you.">Auto-merge<input type="checkbox" id="set-merge" data-testid="set-merge"></label><p class="h" id="merge-note"></p></fieldset>
     </div>
     <p class="h">Changes apply when the next workflow starts (the plan, or the build after H1). A stage turned off is reported as skipped in the evidence.</p>
     <div class="set-actions"><span id="set-msg" class="h"></span><button value="cancel" class="btn">Close</button><button id="set-save" class="btn primary" value="default">Save</button></div>
@@ -355,7 +399,11 @@ const store = {
   set(k, v) { try { localStorage.setItem('wfboard.' + k, JSON.stringify(v)) } catch {} },
 }
 let state = null
-let runId = store.get('runid', null)
+const QS = new URLSearchParams(location.search)
+const EMBED = QS.get('embed') === '1'
+let runId = QS.get('run') || store.get('runid', null)
+let view = 'run', laneAuto = !QS.get('run'), splitSel = new Set(), splitIds = []
+if (EMBED) { document.body.classList.add('embed'); document.documentElement.classList.add('embed') }
 const prefs = { filter: 'all', role: '', phase: '' }
 let model = null
 let open = null, openFile = null, openText
@@ -484,7 +532,8 @@ function markKb() { const rows = [...$('run-list').querySelectorAll('.run-row')]
 function openPop() { $('run-pop').hidden = false; $('run-btn').setAttribute('aria-expanded', 'true'); $('run-q').value = ''; popIndex = -1; renderRunPicker(); $('run-q').focus() }
 function closePop() { $('run-pop').hidden = true; $('run-btn').setAttribute('aria-expanded', 'false') }
 function selectRun(id) {
-  runId = id; store.set('runid', id)
+  runId = id; if (!EMBED) store.set('runid', id)
+  setView('run')
   prefs.filter = 'all'; prefs.role = ''; prefs.phase = ''; docSel = null; docText = undefined; lastSig = ''
   closePop(); closeDrawer(); render()
 }
@@ -500,8 +549,72 @@ function phaseState(gs) {
   return cs.some((c) => c === 'done') ? 'active' : 'pending'
 }
 
+function setView(v) {
+  view = v
+  document.body.classList.toggle('view-lanes', v === 'lanes')
+  document.body.classList.toggle('view-split', v === 'split')
+  if (v === 'split') renderSplit()
+  if (state) render()
+}
+function laneState(l) {
+  const s = String(l.state || '')
+  if (l.question || s.startsWith('waiting')) return ['wait', 'Needs you']
+  if (s.startsWith('running')) return ['running', 'Running']
+  if (s.startsWith('error') || s.startsWith('stopped') || s.startsWith('stalled')) return ['issue', 'Stopped']
+  if (s.startsWith('finished') || s.startsWith('done')) return ['done', 'Done']
+  return ['queued', s || 'Not started']
+}
+function renderLanes() {
+  const lanes = state?.lanes || []
+  $('lanes-btn').hidden = EMBED || !lanes.length
+  $('lanes-back').hidden = EMBED || !lanes.length || view === 'lanes' || !currentRun()?.lane
+  if (view !== 'lanes') return
+  const running = lanes.filter((l) => laneState(l)[0] === 'running').length
+  $('lanes-head').textContent = `Lanes · ${lanes.length}`
+  $('lanes-note').textContent = `${running} running · up to ${state.lanes_cap || 3} at once`
+  const five = state.usage?.five_hour
+  $('lanes-usage').textContent = five && five.used_percentage != null ? `Usage ${Math.round(five.used_percentage)}% of 5 h${five.used_percentage >= 85 ? ' · paused until the reset' : five.used_percentage >= 70 ? ' · 1 lane at a time' : ''}` : ''
+  $('lane-grid').innerHTML = lanes.map((l) => {
+    const [c, label] = laneState(l)
+    const pct = l.total ? Math.round(100 * l.done / l.total) : 0
+    return `<div class="lane-card ${splitSel.has(l.run_id) ? 'sel' : ''}" role="button" tabindex="0" data-lane-run="${esc(l.run_id || '')}" data-testid="lane-card">
+      <input type="checkbox" class="pick" data-pick="${esc(l.run_id || '')}" ${splitSel.has(l.run_id) ? 'checked' : ''} aria-label="Pick lane ${esc(l.lane)} for split view" title="Split view">
+      <div class="top"><span class="n">Lane ${esc(l.lane)}</span><span class="pill ${c === 'wait' ? 'wait' : c === 'issue' ? 'issue' : c === 'done' ? 'done' : c === 'running' ? 'running' : ''}">${esc(label)}</span></div>
+      <div class="t">${esc(l.name)}</div>
+      <div class="cur">${esc(l.current || (c === 'done' ? 'All steps done' : 'Between steps'))}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="meta"><span>${l.done}/${l.total} steps</span><span>${money(l.cost)}</span><span>${l.elapsed ? dur(l.elapsed) : '–'}</span>${l.app_url ? `<a href="${esc(l.app_url)}" target="_blank" rel="noopener">${esc(l.app_url.replace('http://', ''))}</a>` : ''}<span>${esc(l.branch || '')}</span></div>
+      ${l.question ? `<div class="q"><b>Needs you:</b> ${esc(l.question.split('\n')[0])} <span class="h">Answer in the chat that started the lanes.</span></div>` : ''}
+    </div>`
+  }).join('') || '<div class="empty">No lanes yet. Start them with /work lanes.</div>'
+  $('split-btn').disabled = splitSel.size < 2
+  $('split-btn').textContent = splitSel.size >= 2 ? `Split view (${splitSel.size})` : 'Split view'
+}
+function renderSplit() {
+  const ids = [...splitSel].slice(0, 4)
+  if (ids.join() === splitIds.join() && $('split-grid').children.length) return
+  splitIds = ids
+  $('split-note').textContent = `${ids.length} lanes side by side`
+  $('split-grid').className = `split-grid n${ids.length}`
+  $('split-grid').innerHTML = ids.map((id) => {
+    const l = (state?.lanes || []).find((x) => x.run_id === id) || {}
+    return `<div class="split-pane"><div class="ph"><span>Lane ${esc(l.lane || '?')} · ${esc(l.name || id)}</span><button class="btn" data-open-run="${esc(id)}">Open</button></div><iframe src="dashboard.html?run=${encodeURIComponent(id)}&embed=1" title="Lane ${esc(l.lane || '')}"></iframe></div>`
+  }).join('')
+}
+
 function render() {
+  if (laneAuto && !EMBED && state?.lanes?.length) { laneAuto = false; view = 'lanes'; document.body.classList.add('view-lanes') }
+  renderLanes()
   renderRunPicker()
+  if (view === 'lanes' || view === 'split') {
+    const lanes = state.lanes || [], need = lanes.filter((l) => laneState(l)[0] === 'wait').length
+    $('title').textContent = view === 'lanes' ? 'Lanes' : 'Lanes · split view'
+    $('subtitle').textContent = `${lanes.length} lanes · ${lanes.filter((l) => laneState(l)[0] === 'running').length} running${need ? ` · ${need} need you` : ''} · ${money(lanes.reduce((n, l) => n + (l.cost || 0), 0))} so far`
+    $('status-line').textContent = need ? 'A lane is waiting on you: answer in the chat that started the lanes.' : 'Click a lane for its board; tick 2 to 4 for split view. Press L to come back here.'
+    document.title = `${need ? '◆ ' : ''}Lanes · Run board`
+    renderHistory()
+    return
+  }
   const run = currentRun()
   if (!run) { $('title').textContent = 'Run board'; $('subtitle').textContent = 'No workflow runs found yet.'; return }
   model = buildModel(run)
@@ -650,6 +763,7 @@ function fillSettings() {
   $('set-tier').value = tier
   $('tier-note').textContent = TIERS[tier].note
   fillKnobs(tier, (scope === 'run' ? { ...settings.knobs.repo, ...settings.knobs.run } : settings.knobs.repo) || {})
+  $('set-lanes').value = String((scope === 'run' && settings.lanes_cap && settings.lanes_cap.run) || (settings.lanes_cap && settings.lanes_cap.repo) || 3)
   const merge = (scope === 'run' && settings.merge && settings.merge.run) || (settings.merge && settings.merge.repo) || 'owner'
   $('set-merge').checked = merge === 'auto'
   $('merge-note').textContent = merge === 'auto' ? 'An approver merges green PRs; one-way changes still come to you.' : 'PRs wait for you to merge.'
@@ -662,7 +776,7 @@ function mergeRun(repo, run) {
 }
 async function saveSettings(e) {
   e.preventDefault()
-  const body = { scope: $('set-scope').value, tier: $('set-tier').value, merge: $('set-merge').checked ? 'auto' : 'owner', models: {}, stages: {}, team: {} }
+  const body = { scope: $('set-scope').value, tier: $('set-tier').value, merge: $('set-merge').checked ? 'auto' : 'owner', lanes_concurrency: $('set-lanes').value, models: {}, stages: {}, team: {} }
   document.querySelectorAll('[data-model]').forEach((el) => { body.models[el.dataset.model] = el.value })
   document.querySelectorAll('[data-stage]').forEach((el) => { body.stages[el.dataset.stage] = el.checked })
   document.querySelectorAll('[data-team]').forEach((el) => { body.team[el.dataset.team] = el.checked })
@@ -903,6 +1017,22 @@ async function poll() {
 // ---- events ----
 $('run-btn').addEventListener('click', (e) => { e.stopPropagation(); $('run-pop').hidden ? openPop() : closePop() })
 $('openSettings').addEventListener('click', openSettings)
+$('lanes-btn').addEventListener('click', () => setView(view === 'lanes' ? 'run' : 'lanes'))
+$('lanes-back').addEventListener('click', () => setView('lanes'))
+$('split-btn').addEventListener('click', () => { if (splitSel.size >= 2) setView('split') })
+$('lane-grid').addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]')
+  if (pick) {
+    const id = pick.dataset.pick
+    if (pick.checked) { if (splitSel.size >= 4) { pick.checked = false; return } splitSel.add(id) } else splitSel.delete(id)
+    return renderLanes()
+  }
+  if (e.target.closest('a')) return
+  const card = e.target.closest('[data-lane-run]')
+  if (card && card.dataset.laneRun) selectRun(card.dataset.laneRun)
+})
+$('lane-grid').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.dataset.laneRun) selectRun(e.target.dataset.laneRun) })
+$('split-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-open-run]'); if (b) selectRun(b.dataset.openRun) })
 $('settings').addEventListener('click', (e) => {
   const r = $('settings').getBoundingClientRect()
   if (e.target === $('settings') && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) $('settings').close()
@@ -958,6 +1088,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey || document.body.classList.contains('open')) return
   if (e.key.toLowerCase() === 'r') { e.preventDefault(); toggleHist(false); openPop() }
   if (e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHist() }
+  if (e.key.toLowerCase() === 'l' && state?.lanes?.length && !EMBED) { e.preventDefault(); setView(view === 'lanes' ? 'run' : 'lanes') }
 })
 
 // ---- markdown (no external library: works offline and in snapshots) ----
