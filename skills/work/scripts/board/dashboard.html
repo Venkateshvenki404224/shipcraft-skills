@@ -465,7 +465,7 @@ function render() {
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
   $('status-line').textContent = statusLine(run, gs)
   $('banner').innerHTML = (run.error ? `<div class="banner">${esc(run.error)}</div>` : '')
-    + (run.problem ? `<div class="problem ${run.problem.state === 'retried' ? 'soft' : ''}" data-testid="problem"><b>${run.problem.state === 'retried' ? 'Recovered' : run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'}:</b> ${esc(run.problem.why)}. ${esc(run.problem.fix)}</div>` : '')
+    + (run.problem ? `<div class="problem ${['retried', 'paused'].includes(run.problem.state) ? 'soft' : ''}" data-testid="problem"><b>${run.problem.state === 'retried' ? 'Recovered' : run.problem.state === 'paused' ? 'Paused' : run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'}:</b> ${esc(String(run.problem.why || '').replace(/\.$/, ''))}. ${esc(run.problem.fix)}</div>` : '')
     + (run.app ? `<div class="app-link ${run.app.up ? 'up' : 'down'}" data-testid="app-link"><span class="sdot ${run.app.up ? 'finished' : 'failed'}"></span>The app: <a href="${esc(run.app.url)}" target="_blank" rel="noopener">${esc(run.app.url)}</a> <span class="h">${run.app.up ? 'up' : `not answering${run.app.start ? ` · start it with <code>${esc(run.app.start)}</code>` : ''}`}</span></div>` : '')
 
   // KPIs

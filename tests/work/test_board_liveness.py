@@ -370,6 +370,45 @@ class BoardLiveness(unittest.TestCase):
         self.assertEqual(run["unrecovered"], ["Verifier: UI"])
         self.assertEqual(self.problem(run)["state"], "failed")
 
+    ABORT = "Error: Workflow aborted at dt (/$bunfs/root/chunk-tdj3adwd.js:110:8056) at abort (unknown)"
+
+    def fixer_stopped_by_taskstop(self, reason=None):
+        self.fx.start("f2", "Fixer: gate round 2")
+        self.fx.transcript("f2", [rec_user(NOW - 900), rec_tool_use(NOW - 300, "t1", timeout=600000)])
+        self.fx.write_journal(NOW - 900)
+        self.fx.owner("alive")
+        self.fx.status_file("failed", NOW - 250)
+        path = os.path.join(self.fx.session_dir, "workflows", "wf_test.json")
+        with open(path, "w") as f:
+            json.dump({"status": "failed", "error": self.ABORT}, f)
+        os.utime(path, (NOW - 250, NOW - 250))
+        if reason is not None:
+            marker = os.path.join(self.fx.run_dir, ".stopped")
+            with open(marker, "w") as f:
+                f.write(reason)
+            os.utime(marker, (NOW - 240, NOW - 240))
+        return self.fx.export()
+
+    def test_23_a_stop_marked_with_a_reason_is_a_pause_not_a_failure(self):
+        run = self.fixer_stopped_by_taskstop("the orchestrator is fixing the gate by hand")
+        self.assertEqual(run["state"], "paused")
+        self.assertEqual(run["running"], 0)
+        self.assertEqual(rows(run)["f2"]["status"], "STOPPED")
+        problem = self.problem(run)
+        self.assertEqual(problem["state"], "paused")
+        self.assertEqual(problem["why"], "the orchestrator is fixing the gate by hand")
+        self.assertNotIn("bunfs", problem["line"] + problem["fix"])
+
+    def test_24_an_abort_without_a_reason_still_stops_but_shows_no_stack(self):
+        run = self.fixer_stopped_by_taskstop()
+        self.assertEqual(run["state"], "failed")
+        self.assertEqual(rows(run)["f2"]["status"], "STOPPED")
+        self.assertNotIn("bunfs", self.problem(run)["why"])
+        self.assertIn("on purpose", self.problem(run)["why"])
+
+    def test_25_a_real_error_keeps_its_message_without_the_stack(self):
+        self.assertEqual(wfboard.plain_error("TypeError: x is undefined at run (/$bunfs/root/a.js:1:2)"), "TypeError: x is undefined")
+
 
 class AppProbe(unittest.TestCase):
     URL = "https://app.test"

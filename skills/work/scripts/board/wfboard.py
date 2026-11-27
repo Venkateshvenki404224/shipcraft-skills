@@ -87,6 +87,14 @@ def one_line(s, n=160):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def plain_error(error):
+    """The workflow's error without the JavaScript stack, which means nothing to the owner."""
+    text = str(error or "")
+    if re.match(r"^(Error: )?Workflow aborted\b", text):
+        return "the workflow was stopped on purpose (TaskStop or Esc), not by an error"
+    return one_line(re.split(r"\s+at\s+\S+\s+\(", text, maxsplit=1)[0], 300)
+
+
 def tool_summary(name, inp):
     inp = inp or {}
     if name == "Bash":
@@ -459,7 +467,10 @@ def export_run(run_dir, now):
     # not older than the journal's last write.
     # TaskStop leaves no marker in the journal; the orchestrator drops a ".stopped" file in the run dir instead
     stopped_f = os.path.join(os.path.dirname(jpath), ".stopped")
-    finished = finished or (os.path.exists(stopped_f) and os.path.getmtime(stopped_f) >= j_mtime - 1)
+    stop_marked = os.path.exists(stopped_f) and os.path.getmtime(stopped_f) >= j_mtime - 1
+    finished = finished or stop_marked
+    # Text in the marker means the stop was on purpose (the orchestrator took the step over), not a failure.
+    stop_reason = one_line(open(stopped_f, encoding="utf-8", errors="replace").read(), 300) if stop_marked else ""
     # The Workflow tool writes the run's final status to <session>/workflows/<run_id>.json, not to the journal.
     # Without this, an agent superseded by a resume (started, never got a result) shows as running forever.
     wf_file = os.path.join(session_dir, "workflows", run_id + ".json")
@@ -520,7 +531,7 @@ def export_run(run_dir, now):
             mtime = os.path.getmtime(apath) if os.path.exists(apath) else last_write
             status, note, stuck, end = agent_liveness(info, mtime, now, owner, superseded, session_id)
             if finished and status != "FAIL":
-                status = "STOPPED"
+                status, note = "STOPPED", "stopped with the workflow"
             if status == "FAIL":
                 last_error = note
             elif status == "STOPPED" and not superseded and not finished:
@@ -641,6 +652,8 @@ def export_run(run_dir, now):
         state = ("stalled" if queued else "completed") if idle > 600 else "between steps"
     if wf_status in ("failed", "error", "killed", "aborted", "cancelled"):
         state = "failed"
+    if stop_reason:
+        state, why = "paused", stop_reason
     if state == "stopped":
         why = "the Claude Code session that ran this workflow has ended; the last agent write was at " + dt.datetime.fromtimestamp(last_write).strftime("%H:%M")
     elif state == "stalled":
@@ -661,7 +674,7 @@ def export_run(run_dir, now):
         "_prompt_head": prompt_head,
         "_args_run": wf_args.get("run"),
         "script": wf_meta.get("scriptPath"),
-        "error": str(wf_error) if wf_error else None,
+        "error": plain_error(wf_error) if wf_error else None,
         "failed_agents": failed_agents,
         "idle": int(idle),
         "owner": owner, "why": why, "unrecovered": unrecovered, "last_error": last_error,
@@ -750,6 +763,10 @@ def run_problem(mine):
             fix = "The session is still open: ask it. Run /work resume only if it says the workflow is no longer running."
             return {"kind": kind, "run_id": r["id"], "state": "stalled", "why": why, "fix": fix,
                     "line": f"Stalled in the {kind} workflow: {why}. {fix}"}
+        if r["state"] == "paused":
+            return {"kind": kind, "run_id": r["id"], "state": "paused", "why": r.get("why"),
+                    "fix": f"Nothing to do: the orchestrator resumes {r['id']} with /work resume when that is done.",
+                    "line": f"Paused in the {kind} workflow: {r.get('why')}"}
         if r["state"] in ("failed", "stopped"):
             why = r.get("error") or r.get("why") or r.get("last_error") or "the workflow ended with an error"
             return {"kind": kind, "run_id": r["id"], "state": r["state"], "why": why, "fix": resume,
