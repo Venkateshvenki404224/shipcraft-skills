@@ -504,7 +504,7 @@ function render() {
 function statusLine(run, gs) {
   const phases = run.phases || []
   const wait = gs.find((g) => cat(g) === 'wait')
-  if (run.problem && run.problem.state !== 'retried') return `${run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'} in the ${run.problem.kind} workflow. Run /work resume in the Code tab to continue.`
+  if (run.problem && run.problem.state !== 'retried') return run.problem.line || `${run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'} in the ${run.problem.kind} workflow. Run /work resume in the Code tab to continue.`
   if (wait) return `Waiting on you: ${wait.title}. Answer in the Code tab.`
   const running = gs.filter((g) => cat(g) === 'running' && g.id !== 'Orchestrator/main')
   const done = gs.filter((g) => cat(g) === 'done').length
@@ -729,7 +729,8 @@ async function poll() {
     render()
     if (open) await refreshDrawer()
     status.className = SNAP ? 'live snap' : 'live'
-    status.innerHTML = SNAP ? `<span class="dot"></span>Snapshot · ${esc(new Date((SNAP.generated || 0) * 1000).toLocaleString())}` : `<span class="dot"></span>Live · ${new Date().toLocaleTimeString()}`
+    const frozen = !SNAP && state.generated && Date.now() / 1000 - state.generated > 10
+    status.innerHTML = SNAP ? `<span class="dot"></span>Snapshot · ${esc(new Date((SNAP.generated || 0) * 1000).toLocaleString())}` : frozen ? `<span class="dot"></span>Not updating since ${esc(new Date(state.generated * 1000).toLocaleTimeString())}` : `<span class="dot"></span>Live · ${new Date().toLocaleTimeString()}`
   } catch (err) {
     status.className = 'live error'
     status.innerHTML = `<span class="dot"></span>${esc(err.message)}`

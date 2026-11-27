@@ -111,6 +111,7 @@ def parse_agent(path):
     info = {"model": None, "first": None, "last": None, "cost": 0.0,
             "tokens_out": 0, "tokens_in": 0, "events": [], "prompt": None}
     seen_req = set()
+    pending, tail = {}, {"api_error": None, "ended": False}
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             try:
@@ -127,11 +128,16 @@ def parse_agent(path):
                 content = msg.get("content")
                 if info["prompt"] is None:
                     info["prompt"] = text_of(content)
+                tail["api_error"], tail["ended"] = None, False
                 if isinstance(content, list):
                     for b in content:
+                        if isinstance(b, dict) and b.get("type") == "tool_result":
+                            pending.pop(b.get("tool_use_id"), None)
                         if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error"):
                             info["events"].append((t, "error", one_line(text_of(b.get("content")) or b.get("content"), 200)))
             elif typ == "assistant" and msg:
+                tail["api_error"] = (text_of(msg.get("content")) or str(d.get("error"))) if d.get("isApiErrorMessage") else None
+                tail["ended"] = msg.get("stop_reason") == "end_turn"
                 if msg.get("model"):
                     info["model"] = msg["model"]
                 req = d.get("requestId") or msg.get("id")
@@ -153,10 +159,145 @@ def parse_agent(path):
                         continue
                     if b.get("type") == "tool_use":
                         info["events"].append((t, b.get("name"), one_line(tool_summary(b.get("name"), b.get("input")), 200)))
+                        limit = (b.get("input") or {}).get("timeout")
+                        pending[b.get("id")] = (t, b.get("name"), limit / 1000 if isinstance(limit, (int, float)) else None)
                     elif b.get("type") == "text" and b.get("text", "").strip():
                         info["events"].append((t, "says", one_line(b["text"], 240)))
+    info["tail"] = dict(tail, pending=list(pending.values()))
     _agent_cache[path] = (sig, info)
     return info
+
+
+# ---------------------------------------------------------------- liveness
+#
+# Whether a run is alive is decided from direct evidence on every poll, not from how old the journal is:
+# the journal is written only when an agent starts or returns, so a long agent leaves it untouched.
+#   - the session that runs the workflow: <config>/sessions/<pid>.json plus /proc (is that process still there?);
+#   - the agent's transcript: an unanswered tool call means it is busy, an API-error record means it was refused;
+#   - a later "started" line with the same key means the attempt was superseded by a resume.
+# Only "the process is alive, nothing is open and nothing is written" has no evidence beyond the clock.
+
+_owner_pid = {}  # session id -> pid last seen in the registry, to tell "gone" from "never registered"
+
+
+def newest_write(run_dir):
+    try:
+        return max((e.stat().st_mtime for e in os.scandir(run_dir) if e.is_file()), default=0.0)
+    except OSError:
+        return 0.0
+
+
+def proc_start(pid):
+    """Start time of a process in clock ticks since boot (field 22 of /proc/<pid>/stat), or None."""
+    try:
+        with open(os.path.join(PROC, str(pid), "stat")) as f:
+            data = f.read()
+        return int(data[data.rindex(")") + 2:].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def proc_start_time(pid):
+    try:
+        with open(os.path.join(PROC, "stat")) as f:
+            btime = next(int(l.split()[1]) for l in f if l.startswith("btime "))
+        ticks = proc_start(pid)
+        return btime + ticks / (os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100) if ticks is not None else None
+    except (OSError, StopIteration, ValueError):
+        return None
+
+
+def pid_alive(entry):
+    """True / False, or None when this platform cannot say."""
+    pid = entry.get("pid")
+    if not isinstance(pid, int):
+        return False
+    if os.path.exists(os.path.join(PROC, "stat")):
+        started = proc_start(pid)
+        return started is not None and (entry.get("procStart") is None or str(started) == str(entry["procStart"]))
+    if os.name == "nt":
+        return None
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+
+
+def session_owner(session_id, last_write, now):
+    """Is the Claude Code session that runs this workflow still alive? "alive", "gone" or "unknown"."""
+    if now - last_write < FRESH:
+        return "alive"
+    if not os.path.isdir(SESSIONS_DIR):
+        return "unknown"
+    entries = []
+    for p in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                e = json.load(f)
+        except Exception:
+            continue
+        if isinstance(e, dict) and e.get("sessionId") == session_id:
+            entries.append(e)
+    alive = []
+    for e in entries:
+        a = pid_alive(e)
+        if a is None:
+            return "unknown"
+        if a:
+            alive.append(e)
+    if alive:
+        e = max(alive, key=lambda x: x.get("startedAt") or 0)
+        _owner_pid[session_id] = e["pid"]
+        started = proc_start_time(e["pid"]) or ((e.get("startedAt") or 0) / 1000 or None)
+        # a resumed session is a new process: one that began after the run's last write has not picked this run up
+        return "gone" if started and started > last_write + 5 else "alive"
+    if entries or session_id in _owner_pid:
+        return "gone"
+    return "gone" if now - last_write > MODEL_STALE else "unknown"
+
+
+def tool_child_alive(session_id, called_at):
+    """A direct child of the session started when the tool call was made: the command is still running."""
+    owner = _owner_pid.get(session_id)
+    try:
+        btime = next(int(l.split()[1]) for l in open(os.path.join(PROC, "stat")) if l.startswith("btime "))
+        hz = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+        for name in os.listdir(PROC):
+            if not name.isdigit():
+                continue
+            data = open(os.path.join(PROC, name, "stat")).read()
+            f = data[data.rindex(")") + 2:].split()
+            if int(f[1]) == owner and abs(btime + int(f[19]) / hz - called_at) < 3:
+                return True
+    except (OSError, StopIteration, ValueError, IndexError):
+        pass
+    return False
+
+
+def agent_liveness(info, mtime, now, owner, superseded, session_id=None):
+    """For an agent with no result: (status, note, stuck, end). First matching evidence wins."""
+    tail = info.get("tail") or {}
+    last = info.get("last") or mtime
+    if tail.get("api_error"):
+        return "FAIL", one_line(tail["api_error"], 160), False, last
+    if superseded or owner == "gone":
+        return "STOPPED", "", False, last
+    pending = tail.get("pending") or []
+    if pending:
+        oldest = min(t or now for t, _, _ in pending)
+        mins = int((now - oldest) // 60)
+        name = next((n for t, n, _ in pending if (t or now) == oldest), "a tool")
+        note = (f"running a command for {mins} min" if name == "Bash" else f"waiting on {name} for {mins} min") if now - oldest > QUIET_NOTE else ""
+        over = all(now - (t or now) > (limit or TOOL_LIMIT) + TOOL_GRACE for t, _, limit in pending)
+        stuck = over and not any(tool_child_alive(session_id, t) for t, _, _ in pending if t)
+        return "RUN", note, stuck, now
+    idle = now - mtime
+    if tail.get("ended"):
+        return "RUN", f"finished its turn {int(idle // 60)} min ago, no result yet" if idle > QUIET_NOTE else "", idle > MODEL_STALE, now
+    return "RUN", f"waiting on the model for {int(idle // 60)} min" if idle > QUIET_NOTE else "", idle > MODEL_STALE, now
 
 
 # ---------------------------------------------------------------- results
@@ -297,7 +438,7 @@ def export_run(run_dir, now):
             if d.get("type") == "started":
                 aid = d.get("agentId")
                 agents[aid] = {"id": aid, "label": d.get("label") or aid, "phase": d.get("phase") or "Other",
-                               "done": False, "result": None}
+                               "done": False, "result": None, "key": d.get("key")}
                 order.append(aid)
             elif d.get("type") == "result":
                 a = agents.get(d.get("agentId"))
@@ -310,20 +451,33 @@ def export_run(run_dir, now):
                 a["result"] = None
             elif d.get("type") not in ("launched",):
                 other.append(d.get("type"))
-    j_age = now - os.path.getmtime(jpath) if os.path.exists(jpath) else 1e9
+    j_mtime = os.path.getmtime(jpath) if os.path.exists(jpath) else 0.0
+    j_age = now - j_mtime if j_mtime else 1e9
+    last_write = max(j_mtime, newest_write(run_dir))
     finished = any(t in ("completed", "complete", "finished", "done", "returned", "failed", "error", "aborted", "killed", "stopped") for t in other)
+    # A final marker from an earlier invocation stays on disk after a resume, so it counts only when it is
+    # not older than the journal's last write.
     # TaskStop leaves no marker in the journal; the orchestrator drops a ".stopped" file in the run dir instead
-    finished = finished or os.path.exists(os.path.join(os.path.dirname(jpath), ".stopped"))
+    stopped_f = os.path.join(os.path.dirname(jpath), ".stopped")
+    finished = finished or (os.path.exists(stopped_f) and os.path.getmtime(stopped_f) >= j_mtime - 1)
     # The Workflow tool writes the run's final status to <session>/workflows/<run_id>.json, not to the journal.
     # Without this, an agent superseded by a resume (started, never got a result) shows as running forever.
+    wf_file = os.path.join(session_dir, "workflows", run_id + ".json")
     try:
-        wf_meta = json.load(open(os.path.join(session_dir, "workflows", run_id + ".json")))
+        wf_meta = json.load(open(wf_file))
     except Exception:
         wf_meta = {}
-    wf_status = wf_meta.get("status")
+    marker_ok = bool(wf_meta) and os.path.getmtime(wf_file) >= j_mtime - 1
+    wf_status = wf_meta.get("status") if marker_ok else None
+    session_id = os.path.basename(session_dir)
+    owner = session_owner(session_id, last_write, now)
+    keys = {}
+    for aid in order:
+        if agents[aid]["key"]:
+            keys[agents[aid]["key"]] = aid  # the last attempt of a call wins
     finished = finished or (wf_status not in (None, "", "running", "pending", "queued"))
     wf_args = wf_meta.get("args") if isinstance(wf_meta.get("args"), dict) else {}
-    wf_error = wf_meta.get("error") or (wf_meta.get("result") or {}).get("error") if isinstance(wf_meta.get("result"), dict) else wf_meta.get("error")
+    wf_error = (wf_meta.get("error") or (wf_meta.get("result") or {}).get("error") if isinstance(wf_meta.get("result"), dict) else wf_meta.get("error")) if marker_ok else None
     name = wf_meta.get("workflowName") or name
 
     base = os.path.join(OUT, run_id)
@@ -331,6 +485,7 @@ def export_run(run_dir, now):
     groups, gindex = [], {}
     total_cost, first, last = 0.0, None, None
     prompt_head = ""
+    stuck_why, open_dead, last_error = [], 0, None
     for aid in order:
         a = agents[aid]
         apath = os.path.join(run_dir, f"agent-{aid}.jsonl")
@@ -350,7 +505,22 @@ def export_run(run_dir, now):
         if info["last"]:
             last = info["last"] if last is None else max(last, info["last"])
         retried = any(agents[o]["label"].startswith(a["label"] + " (retry") for o in order if o != aid)
-        status = ("STOPPED" if retried and a["result"] is None else ("FAIL" if a["result"] is None else verdict(a["result"]))) if a["done"] else ("STOPPED" if finished or retried else "RUN")
+        note, end = "", info["last"]
+        if a["done"]:
+            status = "STOPPED" if retried and a["result"] is None else ("FAIL" if a["result"] is None else verdict(a["result"]))
+        else:
+            superseded = retried or (bool(a["key"]) and keys[a["key"]] != aid)
+            mtime = os.path.getmtime(apath) if os.path.exists(apath) else last_write
+            status, note, stuck, end = agent_liveness(info, mtime, now, owner, superseded, session_id)
+            if finished and status != "FAIL":
+                status = "STOPPED"
+            if status == "FAIL":
+                last_error = note
+            elif status == "STOPPED" and not superseded and not finished:
+                open_dead += 1
+            elif stuck:
+                stuck_why.append(f"{a['label']} has been {note}")
+        a["status"] = status
         if a["label"] == "tickets" and a["result"]:
             r = a["result"]
             if isinstance(r, str):
@@ -382,14 +552,13 @@ def export_run(run_dir, now):
         if gid not in gindex:
             gindex[gid] = len(groups)
             groups.append({"id": gid, "phase": a["phase"], "key": key, "agents": []})
-        end = info["last"] if (a["done"] or finished) else now
         groups[gindex[gid]]["agents"].append({
             "id": aid, "label": a["label"], "step": step or a["label"], "status": status,
             "model": short_model(info["model"]), "cost": round(info["cost"], 4),
             "tokens_out": info["tokens_out"], "started": info["first"],
             "elapsed": (end - info["first"]) if (info["first"] and end) else 0,
             "ended": info["last"] if a["done"] else None,
-            "last": (f"{info['events'][-1][1]}: {info['events'][-1][2]}" if info["events"] else ""),
+            "last": (f"({note}) " if note else "") + (f"{info['events'][-1][1]}: {info['events'][-1][2]}" if info["events"] else ""),
         })
 
     # Tickets the run planned but has not started yet: shown as queued so the graph shows what comes next.
@@ -447,30 +616,47 @@ def export_run(run_dir, now):
         write(os.path.join(base, "artifacts", "changes.md"), body)
         arts.append({"name": f"changes ({n})", "path": f"{run_id}/artifacts/changes.md", "source": wt})
 
-    running = sum(1 for a in agents.values() if not a["done"]) if not finished else 0
+    running = sum(1 for a in agents.values() if a.get("status") == "RUN")
     queued = any(g["status"] == "TODO" for g in groups)
-    # Nothing running and no journal write for 10 min: the script has returned (or died). With planned
+    idle = now - last_write
+    why = None
+    # Nothing running and nothing written for 10 min: the script has returned (or died). With planned
     # tickets still unstarted that is a stall; otherwise the run is complete.
-    state = "finished" if finished else ("running" if running else (
-        ("stalled" if queued else "completed") if j_age > 600 else "between steps"))
+    if finished:
+        state = "finished"
+    elif owner == "gone":
+        state = "stopped" if open_dead or queued else "completed"
+    elif running and len(stuck_why) == running:
+        state = "stalled"
+    elif running:
+        state = "running"
+    else:
+        state = ("stalled" if queued else "completed") if idle > 600 else "between steps"
     if wf_status in ("failed", "error", "killed", "aborted", "cancelled"):
         state = "failed"
-    elif running and j_age > STALE:
-        state = "stalled"
+    if state == "stopped":
+        why = "the Claude Code session that ran this workflow has ended; the last agent write was at " + dt.datetime.fromtimestamp(last_write).strftime("%H:%M")
+    elif state == "stalled":
+        why = stuck_why[0] if stuck_why else f"nothing has been written for {int(idle // 60)} min and planned work is still waiting"
     failed_agents = [g_a["label"] for g in groups for g_a in g["agents"] if g_a["status"] == "FAIL" or "(retry" in g_a["label"]]
+    calls = {}
+    for a in agents.values():
+        calls.setdefault(re.sub(r" \(retry \d+\)$", "", a["label"]), []).append(a.get("status"))
+    unrecovered = [c for c, st in calls.items() if "FAIL" in st and not {"RUN", "PASS", "CHANGES", "DONE"} & set(st)]
     seen_phases = [g["phase"] for g in groups]
     cols = phases + [p for p in dict.fromkeys(seen_phases) if p not in phases]
     return {
         "id": run_id, "name": name or run_id, "state": state, "events": other,
         "phases": cols, "groups": groups, "artifacts": arts,
         "agents": len(agents), "running": running, "cost": round(total_cost, 2),
-        "started": first, "updated": last, "elapsed": ((now if not finished else (last or now)) - first) if first else 0,
+        "started": first, "updated": last, "elapsed": ((now if state in ("running", "between steps", "stalled") else (last or now)) - first) if first else 0,
         "_prompt_head": prompt_head,
         "_args_run": wf_args.get("run"),
         "script": wf_meta.get("scriptPath"),
         "error": str(wf_error) if wf_error else None,
         "failed_agents": failed_agents,
-        "idle": int(j_age),
+        "idle": int(idle),
+        "owner": owner, "why": why, "unrecovered": unrecovered, "last_error": last_error,
     }
 
 
@@ -493,7 +679,13 @@ def find_runs(project_dirs):
 #    "artifacts": [".agent/issue.md"], "finished": false}
 # Agent transcripts are found as <project>/<session>/subagents/agent-<id>.jsonl.
 
-STALE = 900  # a running agent with no transcript write for this long is flagged
+MODEL_STALE = 600  # s without a record while waiting on the model (the longest wait measured was 275 s)
+TOOL_LIMIT = 600   # s a tool call may run when it names no limit of its own
+TOOL_GRACE = 60    # s past a tool's own limit before it can count as stuck
+FRESH = 10         # s; a write this recent proves the session is alive
+QUIET_NOTE = 120   # s; after this a row says what the agent is waiting on
+PROC = "/proc"
+SESSIONS_DIR = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "sessions")
 
 STEP_RULES = [
     ("research", r"^(Scope|Researcher):"),
@@ -544,10 +736,21 @@ def run_problem(mine):
         names = {"work-plan": "plan", "work-build": "build"}
         phases = {g.get("phase") for g in r.get("groups", [])}
         kind = names.get(r.get("name")) or ("build" if phases & {"Tests first", "Implement", "Gate + E2E"} else "plan" if "Research" in phases else "workflow")
-        if r["state"] in ("failed", "stalled"):
-            why = r.get("error") or (f"no agent has written anything for {r.get('idle', 0) // 60} min" if r["state"] == "stalled" else "the workflow ended with an error")
-            return {"kind": kind, "run_id": r["id"], "state": r["state"], "why": why,
-                    "fix": f"In the Code tab, run /work resume: it continues {r['id']} from where it stopped and reuses every agent that finished."}
+        resume = f"In the Code tab, run /work resume: it continues {r['id']} from where it stopped and reuses every agent that finished."
+        if r["state"] == "stalled":
+            why = r.get("why") or f"no agent has written anything for {r.get('idle', 0) // 60} min"
+            fix = "The session is still open: ask it. Run /work resume only if it says the workflow is no longer running."
+            return {"kind": kind, "run_id": r["id"], "state": "stalled", "why": why, "fix": fix,
+                    "line": f"Stalled in the {kind} workflow: {why}. {fix}"}
+        if r["state"] in ("failed", "stopped"):
+            why = r.get("error") or r.get("why") or r.get("last_error") or "the workflow ended with an error"
+            return {"kind": kind, "run_id": r["id"], "state": r["state"], "why": why, "fix": resume,
+                    "line": f"Stopped in the {kind} workflow. Run /work resume in the Code tab to continue."}
+        if r.get("unrecovered"):
+            names_ = [short_label(n) for n in r["unrecovered"][:3]]
+            why = f"no attempt of {len(r['unrecovered'])} agent(s) returned a result ({', '.join(names_)}): {r.get('last_error') or 'the agent failed'}"
+            return {"kind": kind, "run_id": r["id"], "state": "failed", "why": why, "fix": resume,
+                    "line": f"Stopped in the {kind} workflow. Run /work resume in the Code tab to continue."}
         if r.get("failed_agents"):
             names_ = [re.sub(r" \(retry \d+\)$", "", x) for x in r["failed_agents"]]
             return {"kind": kind, "run_id": r["id"], "state": "retried",
@@ -755,8 +958,12 @@ def export_pipeline(manifest, project_dirs, now, wf_runs=()):
             if info["last"]:
                 last = info["last"] if last is None else max(last, info["last"])
             lastline = f"{info['events'][-1][1]}: {info['events'][-1][2]}" if info["events"] else ""
-            if ast == "RUN" and path and now - os.path.getmtime(path) > STALE:
-                lastline = f"(no activity for {int((now - os.path.getmtime(path)) // 60)} min) " + lastline
+            if ast == "RUN" and path:
+                sid = os.path.basename(os.path.dirname(os.path.dirname(path)))
+                mtime = os.path.getmtime(path)
+                live, note, _, _ = agent_liveness(info, mtime, now, session_owner(sid, mtime, now), False, sid)
+                ast = live if live in ("FAIL", "STOPPED") else ast
+                lastline = (f"({note}) " if note else "") + lastline
             adir = os.path.join(base, "agents", aid)
             report = final_text(path) if path and ast != "RUN" else None
             write(os.path.join(adir, "result.md"), report or ("_Still running._" if ast == "RUN" else "_No report text._"))

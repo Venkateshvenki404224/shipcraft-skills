@@ -151,7 +151,7 @@ Ship only on the owner's `/work ship`, or a green "fix then ship".
 
 ## Recovery: `/work resume`
 
-A single agent that dies (a network drop, an API error) is retried by the workflow up to 3 times, and the board says "Recovered". When the whole workflow stops, the board says "Stopped" or "Stalled" (no agent has written anything for 15 minutes) with the reason. Then:
+A single agent that dies (a network drop, an API error) is retried by the workflow up to 3 times, and the board says "Recovered". When the whole workflow stops, the board says "Stopped" (the session that ran it has ended) or "Stalled" (an agent has been silent for 10 minutes with nothing running) with the reason. Then:
 
 1. Read the recorded run: `python3 $S/scripts/state.py show` prints `workflow plan|build: <runId> (<script>)`.
 2. If that run is still listed as running in this session, stop it first (TaskStop), so two copies do not edit the same files.
