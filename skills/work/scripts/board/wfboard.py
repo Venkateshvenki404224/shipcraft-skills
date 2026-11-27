@@ -469,6 +469,9 @@ def export_run(run_dir, now):
         wf_meta = {}
     marker_ok = bool(wf_meta) and os.path.getmtime(wf_file) >= j_mtime - 1
     wf_status = wf_meta.get("status") if marker_ok else None
+    # A resume appends to the same journal and leaves the earlier invocation's status file behind, older than the
+    # journal. A call that failed before that file was written is run again by the resume, so it is not final.
+    resumed_at = os.path.getmtime(wf_file) if (wf_meta and not marker_ok) else None
     session_id = os.path.basename(session_dir)
     owner = session_owner(session_id, last_write, now)
     keys = {}
@@ -506,8 +509,12 @@ def export_run(run_dir, now):
             last = info["last"] if last is None else max(last, info["last"])
         retried = any(agents[o]["label"].startswith(a["label"] + " (retry") for o in order if o != aid)
         note, end = "", info["last"]
+        ended_at = info["last"] or (os.path.getmtime(apath) if os.path.exists(apath) else 0)
+        before_resume = bool(resumed_at) and a["done"] and a["result"] is None and ended_at <= resumed_at
         if a["done"]:
             status = "STOPPED" if retried and a["result"] is None else ("FAIL" if a["result"] is None else verdict(a["result"]))
+            if before_resume:
+                status, note = "STOPPED", "failed before the resume; the resumed run starts it again"
         else:
             superseded = retried or (bool(a["key"]) and keys[a["key"]] != aid)
             mtime = os.path.getmtime(apath) if os.path.exists(apath) else last_write
@@ -553,7 +560,7 @@ def export_run(run_dir, now):
             gindex[gid] = len(groups)
             groups.append({"id": gid, "phase": a["phase"], "key": key, "agents": []})
         groups[gindex[gid]]["agents"].append({
-            "id": aid, "label": a["label"], "step": step or a["label"], "status": status,
+            "id": aid, "label": a["label"], "step": step or a["label"], "status": status, "before_resume": before_resume,
             "model": short_model(info["model"]), "cost": round(info["cost"], 4),
             "tokens_out": info["tokens_out"], "started": info["first"],
             "elapsed": (end - info["first"]) if (info["first"] and end) else 0,
@@ -638,7 +645,8 @@ def export_run(run_dir, now):
         why = "the Claude Code session that ran this workflow has ended; the last agent write was at " + dt.datetime.fromtimestamp(last_write).strftime("%H:%M")
     elif state == "stalled":
         why = stuck_why[0] if stuck_why else f"nothing has been written for {int(idle // 60)} min and planned work is still waiting"
-    failed_agents = [g_a["label"] for g in groups for g_a in g["agents"] if g_a["status"] == "FAIL" or "(retry" in g_a["label"]]
+    failed_agents = [g_a["label"] for g in groups for g_a in g["agents"]
+                     if not g_a.get("before_resume") and (g_a["status"] == "FAIL" or "(retry" in g_a["label"])]
     calls = {}
     for a in agents.values():
         calls.setdefault(re.sub(r" \(retry \d+\)$", "", a["label"]), []).append(a.get("status"))
@@ -886,7 +894,40 @@ def export_video(root, base, run_id):
     return out
 
 
-_app_seen = {}
+APP_PROBE_EVERY = 3
+APP_DOWN_AFTER = 2
+_app_state, _app_probers = {}, {}
+_app_lock = threading.Lock()
+
+
+def app_record(url, ok, now):
+    # One slow answer on a loaded machine is not an outage: the banner needs two failed checks in a row, and the
+    # first good answer clears it.
+    with _app_lock:
+        s = _app_state.setdefault(url, {"up": None, "fails": 0, "at": 0.0})
+        s["at"] = now
+        if ok:
+            s["up"], s["fails"] = True, 0
+        else:
+            s["fails"] += 1
+            if s["fails"] >= APP_DOWN_AFTER:
+                s["up"] = False
+        return dict(s)
+
+
+def probe_app(url):
+    import urllib.request
+    try:
+        code = urllib.request.urlopen(url, timeout=5).status
+    except Exception as e:
+        code = getattr(e, "code", None)
+    return bool(code) and int(code) < 500
+
+
+def _app_prober(url):
+    while True:
+        app_record(url, probe_app(url), time.time())
+        time.sleep(APP_PROBE_EVERY)
 
 
 def app_info(root, now):
@@ -901,16 +942,12 @@ def app_info(root, now):
     url = app.get("url")
     if not url:
         return None
-    seen = _app_seen.get(url)
-    if not seen or now - seen[0] > 15:
-        try:
-            import urllib.request
-            code = urllib.request.urlopen(url, timeout=2).status
-        except Exception as e:
-            code = getattr(e, "code", None)
-        seen = (now, bool(code) and int(code) < 500)
-        _app_seen[url] = seen
-    return {"url": url, "up": seen[1], "start": app.get("start") or ""}
+    # The probe runs on its own thread so a hung site never delays the board's two-second refresh.
+    if url not in _app_probers:
+        _app_probers[url] = threading.Thread(target=_app_prober, args=(url,), daemon=True)
+        _app_probers[url].start()
+    up = (_app_state.get(url) or {}).get("up")
+    return {"url": url, "up": up is not False, "start": app.get("start") or ""}
 
 
 def export_pipeline(manifest, project_dirs, now, wf_runs=()):

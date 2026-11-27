@@ -344,6 +344,56 @@ class BoardLiveness(unittest.TestCase):
         self.fx.transcript("t", [rec_user(NOW - 800), rec_text(NOW - 100)])
         self.assertEqual(self.fx.export()["state"], "between steps")
 
+    def refused_then_resumed(self, ended_at):
+        for i, label in enumerate(("Verifier: UI", "Verifier: UI (retry 1)", "Verifier: UI (retry 2)")):
+            aid = f"v{i}"
+            self.fx.start(aid, label, phase="Verify")
+            self.fx.transcript(aid, [rec_user(NOW - 3010 + i), rec_api_error(NOW - 3005 + i)])
+            self.fx.journal_lines.append({"type": "failed", "agentId": aid})
+        self.fx.status_file("completed", ended_at)
+        self.fx.start("f2", "Fixer: gate round 2")
+        self.fx.transcript("f2", [rec_user(NOW - 200), rec_tool_use(NOW - 20, "t1", timeout=600000)])
+        self.fx.write_journal(NOW - 200)
+        self.fx.owner("alive")
+        return self.fx.export()
+
+    def test_21_failures_before_a_resume_do_not_stop_the_resumed_run(self):
+        run = self.refused_then_resumed(ended_at=NOW - 2990)
+        self.assertEqual(run["state"], "running")
+        self.assertEqual(run["unrecovered"], [])
+        self.assertEqual(run["failed_agents"], [])
+        self.assertIsNone(self.problem(run))
+        self.assertEqual({rows(run)[f"v{i}"]["status"] for i in range(3)}, {"STOPPED"})
+
+    def test_22_failures_after_the_last_end_still_stop_the_run(self):
+        run = self.refused_then_resumed(ended_at=NOW - 5000)
+        self.assertEqual(run["unrecovered"], ["Verifier: UI"])
+        self.assertEqual(self.problem(run)["state"], "failed")
+
+
+class AppProbe(unittest.TestCase):
+    URL = "https://app.test"
+
+    def setUp(self):
+        wfboard._app_state.clear()
+
+    def test_one_slow_answer_does_not_raise_the_banner(self):
+        wfboard.app_record(self.URL, True, NOW)
+        self.assertTrue(wfboard.app_record(self.URL, False, NOW + 3)["up"])
+
+    def test_two_failures_in_a_row_raise_it(self):
+        wfboard.app_record(self.URL, True, NOW)
+        wfboard.app_record(self.URL, False, NOW + 3)
+        self.assertFalse(wfboard.app_record(self.URL, False, NOW + 6)["up"])
+
+    def test_the_first_answer_after_an_outage_clears_it(self):
+        for t in (0, 3, 6):
+            wfboard.app_record(self.URL, False, NOW + t)
+        self.assertTrue(wfboard.app_record(self.URL, True, NOW + 9)["up"])
+
+    def test_no_answer_yet_is_not_shown_as_down(self):
+        self.assertIsNone(wfboard.app_record(self.URL, False, NOW)["up"])
+
 
 if __name__ == "__main__":
     unittest.main()
