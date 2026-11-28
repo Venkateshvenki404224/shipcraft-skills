@@ -1,0 +1,50 @@
+{
+  "_comment": "Copy to <root>/tools/<slug>.run.json. This one file drives both workflows and the control room. Keys: references/run-config.md.",
+  "slug": "clinic-pharmacy",
+  "product": "Acme Clinic",
+  "mode": "feature",
+  "root": "/home/you/projects/acme-clinic",
+  "docs": "docs/pharmacy",
+  "today": "2026-11-28",
+  "brief": "The owner's or client's request, verbatim.",
+  "brief_files": ["/home/you/projects/acme-clinic/docs/pharmacy/client/requirement.pdf"],
+  "context": "Acme Clinic is a clinic management product on Frappe v16 + ERPNext v16 + Frappe Healthcare v16, with our app acme_clinic and a Vue 3 + frappe-ui staff app at /clinic.\nWHAT EXISTS (reuse, do not redo): reception, doctor and lab screens; branding settings; three print formats; the demo e2e spec (qa/e2e/demo.spec.ts).\nThe client: a two-branch clinic. Demo data is invented.",
+  "environment": "- Local bench in Docker: site clinic.localhost, http://localhost:8000; staff app /clinic; Desk /desk. Demo users share the password in env var DEMO_PASSWORD (env/.demo.env): read it from the environment, never print it.\n- App source on the host: <root>/app/ (bind-mounted at /workspace/app). Edit with file tools on the host.\n- Bench commands ONLY through the locked wrapper: \"<root>/env/benchl\" --site clinic.localhost <cmd>.\n- Frontend build: docker compose -f \"<root>/env/compose.yml\" exec -T -w /workspace/app/frontend bench flock /tmp/yarn.lock yarn build. yarn/npx only inside the container.\n- Python reloads by itself; DocType JSON / custom fields / print formats need migrate (via benchl).\n- Browser checks: Playwright from <root>/qa/e2e/ on the host.",
+  "rules": [
+    "Keep the existing demo spec passing.",
+    "Never call a rule-based feature 'AI'."
+  ],
+  "ui": true,
+  "viewport": "1366x768 (owner screens also at 360 px)",
+  "demo_budget": "one evening of agent work",
+  "gate": "",
+  "gate_role": "seed",
+  "fix_rounds": 1,
+  "signoff": true,
+  "verify_research": "once",
+  "research": [
+    {"key": "pharmacy-rules", "title": "Pharmacy rules the clinic must follow", "task": "Dispensing, batch and expiry, controlled-drug registers and billing rules for a small clinic pharmacy in the client's country; cite the regulations.", "out": "research/01-pharmacy-rules.md"},
+    {"key": "existing-fit", "title": "What ERPNext and Healthcare already give us", "task": "Map the doctypes, hooks and reports that cover dispensing and stock; cite file paths.", "out": "research/02-existing-fit.md"}
+  ],
+  "roles": {
+    "pm":   {"label": "PM", "name": "Project Manager", "model": "fable", "desc": "Project Manager: you lead the project, write the requirements, the plan and the report."},
+    "ceo":  {"label": "CEO", "name": "CEO", "model": "opus", "desc": "CEO: you think from the customer's and the business's point of view; you decide scope and sign off the demo."},
+    "ver":  {"label": "Verifier", "name": "Verifier", "model": "opus", "desc": "Adversarial verifier: you try to refute claims and break the build; you fix confirmed defects in documents."},
+    "res":  {"label": "Research", "name": "Researchers", "model": "haiku", "desc": "Research sub-agent working for the project manager."},
+    "fdev": {"label": "Senior Frappe dev", "name": "Senior Frappe Developer", "model": "sonnet", "builder": true, "desc": "Senior Frappe developer (fdev): expert in Frappe v16, ERPNext and Healthcare internals. You own doctypes, custom fields, roles, hooks.py and the domain APIs (plan §9)."},
+    "sdev": {"label": "Senior dev", "name": "Senior Developer", "model": "sonnet", "builder": true, "desc": "Senior developer (sdev): you own the session and billing APIs, print helpers, overrides and security probes (plan §9)."},
+    "fe1":  {"label": "Frontend 1", "name": "Frontend 1", "model": "sonnet", "builder": true, "desc": "Frontend developer 1 (fe1): Vue 3 + frappe-ui SPA in app/frontend. You own the screens plan §9 gives you."},
+    "ux":   {"label": "UI/UX", "name": "UI/UX Designer", "model": "sonnet", "builder": true, "desc": "UI/UX designer (ux): you own the design files, print HTML/CSS and fonts. You design from the users' side: neat, calm, professional, status colours with text labels."},
+    "seed": {"label": "Demo data", "name": "Demo Data", "model": "sonnet", "builder": true, "desc": "Demo data owner (seed): you own the seed, the reset script, the clean backup, the e2e spec and the gate runs. Only you may reset the system."}
+  },
+  "control_room": {
+    "team_note": "You (owner) · Claude (orchestrator)",
+    "output": "../clinic-pharmacy-dashboard.html",
+    "environment": {
+      "label": "Local bench",
+      "health": {"url": "http://127.0.0.1:8000/api/method/ping", "expect": "pong", "ok_text": "ping → pong"},
+      "compose_project": "env",
+      "links": [{"label": "Staff app", "url": "http://localhost:8000/clinic"}, {"label": "Desk", "url": "http://localhost:8000/desk"}]
+    }
+  }
+}

@@ -9,7 +9,7 @@
     {
       "name": "shipcraft",
       "source": "./",
-      "description": "Ten skills and three agents for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, draw the design as reviewed Excalidraw diagrams, run a feature end to end through an agent pipeline with a live run board, watch a team of agents in a live project control room, and ship pull requests with reviewed screenshots. The agents implement, review and test Frappe changes.",
+      "description": "Eleven skills and three agents for AI-assisted engineering: map large work, slice it into shippable phases, pick the right data structures, deepen the architecture, draw the design as reviewed Excalidraw diagrams, run a feature end to end through an agent pipeline with a live run board, build a whole product from a client brief to a gated demo with an agent team, watch a team of agents in a live project control room, and ship pull requests with reviewed screenshots. The agents implement, review and test Frappe changes.",
       "category": "engineering",
       "keywords": [
         "engineering",
