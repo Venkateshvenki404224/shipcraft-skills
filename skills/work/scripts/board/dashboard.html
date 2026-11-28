@@ -465,7 +465,7 @@ function render() {
     .map((s, i) => (i ? '· ' : '') + s).join(' ')
   $('status-line').textContent = statusLine(run, gs)
   $('banner').innerHTML = (run.error ? `<div class="banner">${esc(run.error)}</div>` : '')
-    + (run.problem ? `<div class="problem ${run.problem.state === 'retried' ? 'soft' : ''}" data-testid="problem"><b>${run.problem.state === 'retried' ? 'Recovered' : run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'}:</b> ${esc(run.problem.why)}. ${esc(run.problem.fix)}</div>` : '')
+    + (run.problem ? `<div class="problem ${['retried', 'paused'].includes(run.problem.state) ? 'soft' : ''}" data-testid="problem"><b>${run.problem.state === 'retried' ? 'Recovered' : run.problem.state === 'paused' ? 'Paused' : run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'}:</b> ${esc(String(run.problem.why || '').replace(/\.$/, ''))}. ${esc(run.problem.fix)}</div>` : '')
     + (run.app ? `<div class="app-link ${run.app.up ? 'up' : 'down'}" data-testid="app-link"><span class="sdot ${run.app.up ? 'finished' : 'failed'}"></span>The app: <a href="${esc(run.app.url)}" target="_blank" rel="noopener">${esc(run.app.url)}</a> <span class="h">${run.app.up ? 'up' : `not answering${run.app.start ? ` · start it with <code>${esc(run.app.start)}</code>` : ''}`}</span></div>` : '')
 
   // KPIs
@@ -504,7 +504,7 @@ function render() {
 function statusLine(run, gs) {
   const phases = run.phases || []
   const wait = gs.find((g) => cat(g) === 'wait')
-  if (run.problem && run.problem.state !== 'retried') return `${run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'} in the ${run.problem.kind} workflow. Run /work resume in the Code tab to continue.`
+  if (run.problem && run.problem.state !== 'retried') return run.problem.line || `${run.problem.state === 'stalled' ? 'Stalled' : 'Stopped'} in the ${run.problem.kind} workflow. Run /work resume in the Code tab to continue.`
   if (wait) return `Waiting on you: ${wait.title}. Answer in the Code tab.`
   const running = gs.filter((g) => cat(g) === 'running' && g.id !== 'Orchestrator/main')
   const done = gs.filter((g) => cat(g) === 'done').length
@@ -729,7 +729,8 @@ async function poll() {
     render()
     if (open) await refreshDrawer()
     status.className = SNAP ? 'live snap' : 'live'
-    status.innerHTML = SNAP ? `<span class="dot"></span>Snapshot · ${esc(new Date((SNAP.generated || 0) * 1000).toLocaleString())}` : `<span class="dot"></span>Live · ${new Date().toLocaleTimeString()}`
+    const frozen = !SNAP && state.generated && Date.now() / 1000 - state.generated > 10
+    status.innerHTML = SNAP ? `<span class="dot"></span>Snapshot · ${esc(new Date((SNAP.generated || 0) * 1000).toLocaleString())}` : frozen ? `<span class="dot"></span>Not updating since ${esc(new Date(state.generated * 1000).toLocaleTimeString())}` : `<span class="dot"></span>Live · ${new Date().toLocaleTimeString()}`
   } catch (err) {
     status.className = 'live error'
     status.innerHTML = `<span class="dot"></span>${esc(err.message)}`

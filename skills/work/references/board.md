@@ -5,7 +5,7 @@
 The page uses the same design as the `control-room` skill, in light and dark:
 - **Header:** the run picker (R).
 - **Status line:** one sentence under the title: what is running now, how many steps are done and which owner gate comes next; or "Waiting on you: …"; or "Stopped in the build workflow. Run /work resume …".
-- **Problem bar:** "Recovered" when agents failed and were retried, "Stalled" or "Stopped" with the reason and the `/work resume` fix when the workflow itself stopped.
+- **Problem bar:** "Recovered" when agents failed and were retried, "Stopped" (the session that ran the workflow ended) or "Stalled" (an agent silent for 10 minutes with nothing running) with the reason and the `/work resume` fix when the workflow itself stopped.
 - **KPI cards:** steps done, current stage, what waits on the owner, models and estimated cost.
 - **Stage stepper:** a step waiting on the owner pulses; click a step to filter by it.
 - **Team and steps:** the team list and a steps table with status filters. Click a row for that step's result, activity and prompt.
