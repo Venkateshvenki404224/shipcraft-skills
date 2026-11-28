@@ -1,6 +1,6 @@
 # Shipcraft
 
-Ten agent skills and three agents for Claude Code. They carry engineering work
+Eleven agent skills and three agents for Claude Code. They carry engineering work
 from a foggy idea to a merged pull request.
 
 Each skill covers one stage. Use one on its own, or run them in order.
@@ -12,6 +12,7 @@ Each skill covers one stage. Use one on its own, or run them in order.
 | 3. Build | [`dsa-conscious-coding`](skills/dsa-conscious-coding/) | Picks the data structure and the query before the code. Checks Big O against the data size the feature will really see. |
 | 4. Deepen | [`improve-codebase-architecture`](skills/improve-codebase-architecture/) | Finds shallow modules, reports them as an HTML page with before and after diagrams, then works through the one you pick. |
 | 3–5. Build to ship | [`work`](skills/work/) | Runs one feature end to end with an agent team: research, a PM brief, a CEO scope check, an architect's plan, a UI/UX design, senior developer feasibility, PM decisions, a verifier and an approval agent, your OK, tests first, backend/frontend/UI developers, the gate, verification, agent QA per role on video, UI before/after screenshots reviewed by the designer, evidence, a PM acceptance report and a CEO sign-off, your ship decision. Optional unattended mode. A live run board shows every agent by role. |
+| 1–5. Brief to demo | [`product-build`](skills/product-build/) | Builds a whole product, or a big module on one, with an agent team in two Workflow runs. The plan run: verified research, PM requirements, the CEO's scope, demo slice and done gate, Frappe and architecture feasibility, the PM's plan with a machine-readable ticket list, and a verifier review. Your OK. The build run: a ticket scheduler (one agent per role), close-out, verifier, design review and gate, fixes, a final gate, a PM report and a CEO sign-off. One run file drives both runs and the control room. |
 | 5. Ship | [`raise-pr`](skills/raise-pr/) | Lints like CI, commits, pushes and opens the PR with a short body and screenshots. Watches the checks. Merges only when you ask. |
 | 5. Ship | [`pr-screenshots`](skills/pr-screenshots/) | Captures before and after screenshots of a UI change, crops them to the change, marks it in red, and publishes them in the PR body. |
 | 5. Ship | [`visual-reviewer`](skills/visual-reviewer/) | Judges how a UI change looks to a user: light and dark theme, mobile, spacing, contrast. Returns LGTM, REQUEST CHANGES or BLOCKED. |
@@ -157,6 +158,15 @@ the stages are the workflow phases and the roles are the agent-label prefixes.
 In a cloud session, `--refresh 0` writes a static snapshot to publish as an
 Artifact. The page loads Inter from Google Fonts and the Markdown reader from
 cdnjs.
+
+`product-build` needs Python 3 and the Workflow tool in Claude Code, and uses
+the `control-room` skill next to it for the live page. It expects a running
+system the agents can test against; `references/environment.md` describes a
+Frappe bench in Docker with a locked `bench` wrapper so parallel agents never
+migrate at the same time. The research, feasibility and security briefs assume
+Frappe, so on another stack edit the role briefs in the run file. All
+project-specific values live in one run file (`tools/<slug>.run.json`), so the
+workflow templates stay unchanged.
 
 `improve-codebase-architecture` writes an HTML report to the system temporary
 directory and opens it. Nothing lands in your repository.
